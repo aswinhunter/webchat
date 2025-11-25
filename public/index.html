@@ -4,60 +4,102 @@
     <title>Chat</title>
     <style>
         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f9; }
-        #chat { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; border: 1px solid #ccc; background: white; padding: 10px; border-radius: 8px; margin-bottom: 10px;}
-        #chat li { padding: 5px 0; border-bottom: 1px dotted #eee; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #chat { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; border: 1px solid #ccc; background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 10px;}
+        #chat li { padding: 5px 0; border-bottom: 1px dotted #eee; word-wrap: break-word; }
         #chat li:last-child { border-bottom: none; }
-        input#msg { padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 300px; margin-right: 10px; }
+        .username-msg { font-weight: bold; color: #007bff; margin-right: 5px; }
+        .self-msg { color: #28a745; }
+        input#msg { padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: calc(100% - 90px - 15px); margin-right: 10px; }
         button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
+        .input-container { display: flex; }
     </style>
 </head>
 <body>
 
-    <h1>Simple Chat Application</h1>
-
-    <div class="input-container">
-        <input id="msg" placeholder="Type message..." onkeypress="if(event.keyCode === 13) send()" />
-        <button onclick="send()">Send</button>
+    <div class="container">
+        <h1 id="welcome-header">Simple Chat Application</h1>
+        <ul id="chat"></ul>
+        <div class="input-container">
+            <input id="msg" placeholder="Type message..." onkeypress="if(event.keyCode === 13) send()" />
+            <button onclick="send()">Send</button>
+        </div>
     </div>
-
-    <ul id="chat"></ul>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
     <script>
-        const socket = io("http://localhost:5000");
+        let socket;
+        let username;
 
-        // Function to display a message in the chat list
-        function displayMessage(data) {
+        // --- Initialization ---
+        function getUsernameFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('username');
+        }
+
+        window.onload = function() {
+            username = getUsernameFromUrl();
+            
+            if (!username) {
+                // If no username, redirect back to login
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Update header to welcome the user
+            document.getElementById('welcome-header').innerText = `Welcome, ${username}!`;
+            
+            connectSocket();
+        };
+        // ----------------------
+
+        function connectSocket() {
+            socket = io("http://localhost:5000");
+
+            // LISTENER: Handles messages received from OTHERS
+            socket.on("message", (data) => {
+                displayMessage(data.text, data.username, false);
+            });
+        }
+
+        function displayMessage(text, sender, isSelf) {
             const li = document.createElement("li");
-            li.innerText = data;
+            const usernameSpan = document.createElement("span");
+            usernameSpan.className = 'username-msg';
+            usernameSpan.innerText = `${sender}: `;
+
+            if (isSelf) {
+                li.className = 'self-msg';
+            }
+
+            li.appendChild(usernameSpan);
+            li.append(text);
+
             document.getElementById("chat").appendChild(li);
-            // Auto-scroll to the latest message
             const chatWindow = document.getElementById("chat");
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }
 
-        // 1. LISTENER: This handles messages received from OTHERS (and the server echo)
-        socket.on("message", (data) => {
-            // Note: The server sends the message back to ALL clients, including the sender.
-            // This is generally redundant when using the local display logic below,
-            // but is necessary for all other clients.
-            displayMessage(data);
-        });
-
         function send() {
+            if (!socket || !username) return;
+
             const inputElement = document.getElementById("msg");
             const text = inputElement.value.trim();
 
             if (text === "") return;
 
-            // 2. SENDER UPDATE: Display the message immediately in the sender's window
-            // This ensures a responsive UI and avoids the issue you experienced.
-            displayMessage(text);
+            const messageData = {
+                username: username,
+                text: text
+            };
+
+            // 1. Display the message immediately for the sender
+            displayMessage(text, username, true);
             
-            // 3. EMIT: Send the message to the server
-            socket.emit("message", text);
+            // 2. Emit the message object to the server
+            socket.emit("message", messageData);
             
             // Clear the input field
             inputElement.value = "";
