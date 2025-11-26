@@ -1,145 +1,100 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Login / Sign Up</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f9; }
-        .auth-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 350px; text-align: center; }
-        input, button { padding: 10px; border-radius: 4px; width: 90%; margin-bottom: 10px; box-sizing: border-box; }
-        input { border: 1px solid #ccc; }
-        button { background-color: #007bff; color: white; border: none; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        h2 { margin-top: 0; }
-        .toggle-link { cursor: pointer; color: #007bff; text-decoration: underline; margin-top: 15px; display: block; }
-        .error-message { color: red; margin-top: 10px; }
-    </style>
-</head>
-<body>
+<script type="module">
+    import { 
+        auth, 
+        createUserWithEmailAndPassword, 
+        signInWithEmailAndPassword
+    } from './js/firebase-config.js'; //
 
-    <div class="auth-container">
-        <div id="login-form">
-            <h2>Log In</h2>
-            <input type="email" id="login-email" placeholder="Email" />
-            <input type="password" id="login-password" placeholder="Password" />
-            <button onclick="handleLogin()">Log In</button>
-            <p id="login-error" class="error-message"></p>
-            <span class="toggle-link" onclick="toggleForm('signup')">Need an account? Sign Up</span>
-        </div>
+    // Helper to switch between forms
+    function toggleForm(form) {
+        document.getElementById('login-form').style.display = form === 'login' ? 'block' : 'none';
+        document.getElementById('signup-form').style.display = form === 'signup' ? 'block' : 'none';
+        document.getElementById('login-error').innerText = '';
+        document.getElementById('signup-error').innerText = '';
+    }
 
-        <div id="signup-form" style="display:none;">
-            <h2>Create Account</h2>
-            <input type="text" id="signup-name" placeholder="Name" />
-            <input type="number" id="signup-age" placeholder="Age" min="1" />
-            <input type="text" id="signup-username" placeholder="Username (for chat)" maxlength="15" />
-            <input type="email" id="signup-email" placeholder="Email" />
-            <input type="password" id="signup-password" placeholder="Password (min 6 chars)" />
-            <button onclick="handleSignUp()">Sign Up</button>
-            <p id="signup-error" class="error-message"></p>
-            <span class="toggle-link" onclick="toggleForm('login')">Already have an account? Log In</span>
-        </div>
-    </div>
+    async function handleSignUp() {
+        const name = document.getElementById('signup-name').value.trim();
+        const age = document.getElementById('signup-age').value.trim();
+        const username = document.getElementById('signup-username').value.trim();
+        const email = document.getElementById('signup-email').value.trim();
+        const password = document.getElementById('signup-password').value;
+        const errorElement = document.getElementById('signup-error');
+        errorElement.innerText = '';
 
-    <script type="module">
-        import { 
-            auth, 
-            createUserWithEmailAndPassword, 
-            signInWithEmailAndPassword
-        } from './js/firebase-config.js';
-
-        // Helper to switch between forms
-        window.toggleForm = (form) => {
-            document.getElementById('login-form').style.display = form === 'login' ? 'block' : 'none';
-            document.getElementById('signup-form').style.display = form === 'signup' ? 'block' : 'none';
-            document.getElementById('login-error').innerText = '';
-            document.getElementById('signup-error').innerText = '';
+        if (!name || !age || !username || !email || password.length < 6) {
+            errorElement.innerText = "Please fill all fields. Password must be 6+ chars.";
+            return;
         }
 
-        async function handleSignUp() {
-            const name = document.getElementById('signup-name').value.trim();
-            const age = document.getElementById('signup-age').value.trim();
-            const username = document.getElementById('signup-username').value.trim();
-            const email = document.getElementById('signup-email').value.trim();
-            const password = document.getElementById('signup-password').value;
-            const errorElement = document.getElementById('signup-error');
-            errorElement.innerText = '';
+        try {
+            // 1. Create the user in Firebase Auth
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
 
-            if (!name || !age || !username || !email || password.length < 6) {
-                errorElement.innerText = "Please fill all fields. Password must be 6+ chars.";
-                return;
+            // 2. Save additional profile data to MongoDB via Node.js server API
+            const profileResponse = await fetch('/api/save-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    uid: user.uid, 
+                    username: username, 
+                    name: name, 
+                    age: parseInt(age), 
+                    email: email 
+                })
+            });
+            
+            if (!profileResponse.ok) {
+                const errorData = await profileResponse.json();
+                throw new Error(errorData.message || 'Failed to save profile data to MongoDB.');
             }
+            
+            alert(`Welcome, ${username}! Account created and profile saved.`);
+            
+            // 3. Redirect to chat page
+            window.location.href = `index.html`;
 
-            try {
-                // 1. Create the user in Firebase Auth
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                const user = userCredential.user;
-
-                // 2. Save additional profile data to MongoDB via Node.js server API (NEW STEP)
-                const profileResponse = await fetch('/api/save-profile', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        uid: user.uid, 
-                        username: username, 
-                        name: name, 
-                        age: parseInt(age), 
-                        email: email 
-                    })
-                });
-                
-                if (!profileResponse.ok) {
-                    const errorData = await profileResponse.json();
-                    throw new Error(errorData.message || 'Failed to save profile data to MongoDB.');
-                }
-                
-                alert(`Welcome, ${username}! Account created and profile saved.`);
-                
-                // 3. Redirect to chat page (no need for UID in URL, as the Auth state is already managed by Firebase)
-                window.location.href = `index.html`;
-
-            } catch (error) {
-                console.error("Sign Up Error:", error);
-                // Handle Firebase or MongoDB error
-                let message = error.message;
-                if (error.code && error.code === 'auth/email-already-in-use') {
-                    message = 'This email is already in use by Firebase Auth.';
-                }
-                errorElement.innerText = `Sign Up Failed: ${message}`;
+        } catch (error) {
+            console.error("Sign Up Error:", error);
+            let message = error.message;
+            if (error.code && error.code === 'auth/email-already-in-use') {
+                message = 'This email is already in use by Firebase Auth.';
             }
+            errorElement.innerText = `Sign Up Failed: ${message}`;
+        }
+    }
+
+    async function handleLogin() {
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        const errorElement = document.getElementById('login-error');
+        errorElement.innerText = '';
+
+        if (!email || !password) {
+            errorElement.innerText = "Please enter both email and password.";
+            return;
         }
 
-        async function handleLogin() {
-            const email = document.getElementById('login-email').value.trim();
-            const password = document.getElementById('login-password').value;
-            const errorElement = document.getElementById('login-error');
-            errorElement.innerText = '';
+        try {
+            // 1. Sign in the user using Firebase Auth
+            await signInWithEmailAndPassword(auth, email, password);
 
-            if (!email || !password) {
-                errorElement.innerText = "Please enter both email and password.";
-                return;
+            // 2. Redirect to chat page.
+            window.location.href = `index.html`;
+            
+        } catch (error) {
+            console.error("Login Error:", error);
+            let message = error.message;
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                message = 'Invalid email or password.';
             }
-
-            try {
-                // 1. Sign in the user using Firebase Auth
-                await signInWithEmailAndPassword(auth, email, password);
-
-                // 2. Redirect to chat page. The index.html listener will automatically pick up the signed-in user.
-                window.location.href = `index.html`;
-                
-            } catch (error) {
-                console.error("Login Error:", error);
-                // Display user-friendly error messages
-                let message = error.message;
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                    message = 'Invalid email or password.';
-                }
-                errorElement.innerText = `Login Failed: ${message}`;
-            }
+            errorElement.innerText = `Login Failed: ${message}`;
         }
+    }
 
-        // Expose functions globally for HTML onClick
-        window.handleSignUp = handleSignUp;
-        window.handleLogin = handleLogin;
-    </script>
-
-</body>
-</html>
+    // ⭐ CRITICAL FIX: Explicitly expose functions globally for HTML onclick handlers
+    window.toggleForm = toggleForm;
+    window.handleSignUp = handleSignUp;
+    window.handleLogin = handleLogin;
+</script>
