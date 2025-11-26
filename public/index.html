@@ -3,6 +3,7 @@
 <head>
     <title>Chat</title>
     <style>
+        /* (Styles remain the same) */
         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f9; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         #chat { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; border: 1px solid #ccc; background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 10px;}
@@ -19,46 +20,84 @@
 <body>
 
     <div class="container">
-        <h1 id="welcome-header">Simple Chat Application</h1>
+        <h1 id="welcome-header">Loading Chat...</h1>
         <ul id="chat"></ul>
         <div class="input-container">
-            <input id="msg" placeholder="Type message..." onkeypress="if(event.keyCode === 13) send()" />
-            <button onclick="send()">Send</button>
+            <input id="msg" placeholder="Type message..." onkeypress="if(event.keyCode === 13) send()" disabled />
+            <button onclick="send()" disabled>Send</button>
         </div>
+        <button onclick="logout()" style="background-color: #dc3545; width: 100%; margin-top: 10px;">Log Out</button>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
-    <script>
+    <script type="module">
+        import { 
+            auth, 
+            onAuthStateChanged,
+            signOut 
+        } from './js/firebase-config.js'; // Firestore imports removed
+
         let socket;
         let username;
+        const inputElement = document.getElementById("msg");
+        const sendButton = document.querySelector("button[onclick='send()']");
 
-        // --- Initialization ---
-        function getUsernameFromUrl() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('username');
+        // --- Auth State Listener and Initialization ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // User is signed in, now fetch their chat profile (username) from the Node.js server
+                await fetchUserProfile(user.uid);
+                
+                if (username) {
+                    connectSocket();
+                    inputElement.disabled = false;
+                    sendButton.disabled = false;
+                    document.getElementById('welcome-header').innerText = `Welcome, ${username}!`;
+                } else {
+                    // Fallback if profile data is missing in MongoDB
+                    alert("User profile not found in MongoDB. Redirecting to sign up.");
+                    // Sign out the user to clear the session
+                    await signOut(auth);
+                    window.location.href = 'auth.html';
+                }
+            } else {
+                // User is signed out or session expired/invalid
+                window.location.href = 'auth.html';
+            }
+        });
+
+        // NEW: Function to fetch profile from the Node.js server API
+        async function fetchUserProfile(uid) {
+            try {
+                const response = await fetch(`/api/username/${uid}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    username = data.username; // Set the chat username
+                } else {
+                    console.error("Failed to fetch username from server:", response.status);
+                    username = undefined;
+                }
+            } catch (error) {
+                console.error("Network or server error during profile fetch:", error);
+                username = undefined;
+            }
         }
 
-        window.onload = function() {
-            username = getUsernameFromUrl();
-            
-            if (!username) {
-                // If no username, redirect back to login
-                window.location.href = 'login.html';
-                return;
-            }
+        function logout() {
+            signOut(auth).then(() => {
+                window.location.href = 'auth.html';
+            }).catch((error) => {
+                console.error("Logout Error:", error);
+                alert("Could not log out.");
+            });
+        }
+        window.logout = logout; // Make logout globally accessible for HTML button
 
-            // Update header to welcome the user
-            document.getElementById('welcome-header').innerText = `Welcome, ${username}!`;
-            
-            connectSocket();
-        };
-        // ----------------------
 
+        // --- Socket Logic (Unchanged) ---
         function connectSocket() {
             socket = io("http://localhost:5000");
-
-            // LISTENER: Handles messages received from OTHERS
             socket.on("message", (data) => {
                 displayMessage(data.text, data.username, false);
             });
@@ -84,10 +123,7 @@
 
         function send() {
             if (!socket || !username) return;
-
-            const inputElement = document.getElementById("msg");
             const text = inputElement.value.trim();
-
             if (text === "") return;
 
             const messageData = {
@@ -95,15 +131,11 @@
                 text: text
             };
 
-            // 1. Display the message immediately for the sender
             displayMessage(text, username, true);
-            
-            // 2. Emit the message object to the server
             socket.emit("message", messageData);
-            
-            // Clear the input field
             inputElement.value = "";
         }
+        window.send = send;
     </script>
 
 </body>
