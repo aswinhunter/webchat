@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Up / Login</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f9; }
+        .auth-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: calc(100% - 20px); margin-bottom: 15px; box-sizing: border-box; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 10px;}
+        button:hover { background-color: #0056b3; }
+        .toggle-link { cursor: pointer; color: #007bff; margin-top: 15px; display: inline-block;}
+    </style>
+</head>
+<body>
+
+    <div class="auth-container">
+        <h2 id="auth-header">Sign Up</h2>
+        <div id="status-message" style="color: red; margin-bottom: 10px;"></div>
+
+        <div id="signup-fields">
+            <input id="username-input" type="text" placeholder="Username (Required for Signup)" maxlength="15" />
+            <input id="age-input" type="number" placeholder="Age (Required for Signup)" min="1" />
+            <input id="details-input" type="text" placeholder="Details (Required for Signup)" />
+        </div>
+
+        <input id="email-input" type="email" placeholder="Gmail (Email)" />
+        <input id="password-input" type="password" placeholder="Password" />
+
+        <button id="auth-button" onclick="handleAuth()">Sign Up</button>
+        
+        <p class="toggle-link" onclick="toggleMode()">Already have an account? Log In</p>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-analytics-compat.js"></script>
+
+    <script>
+        // Your provided Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCpJ1pfkHQXwjOlG7FHeh3XxtxwFkLscI",
+            authDomain: "newapplicatioon.firebaseapp.com",
+            projectId: "newapplicatioon",
+            storageBucket: "newapplicatioon.firebasestorage.app",
+            messagingSenderId: "197141078730",
+            appId: "1:197141078730:web:5440a7bfd71e2a9a92ca33",
+            measurementId: "G-F1FE2F770S"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const analytics = firebase.analytics();
+
+        let isSignUpMode = true;
+        const header = document.getElementById('auth-header');
+        const button = document.getElementById('auth-button');
+        const signupFields = document.getElementById('signup-fields');
+        const statusMessage = document.getElementById('status-message');
+
+        function toggleMode() {
+            isSignUpMode = !isSignUpMode;
+            header.innerText = isSignUpMode ? 'Sign Up' : 'Log In';
+            button.innerText = isSignUpMode ? 'Sign Up' : 'Log In';
+            signupFields.style.display = isSignUpMode ? 'block' : 'none';
+            document.querySelector('.toggle-link').innerText = isSignUpMode ? 'Already have an account? Log In' : 'Need an account? Sign Up';
+            statusMessage.innerText = ''; 
+        }
+
+        async function saveUserDetails(uid, email, username, age, details) {
+            // API call to your server to save username, age, and details to MongoDB
+            const response = await fetch('/api/user/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ firebaseUid: uid, username, age: parseInt(age), details, email })
+            });
+            if (!response.ok) {
+                throw new Error('Failed to save user details to MongoDB.');
+            }
+        }
+
+        async function handleAuth() {
+            statusMessage.innerText = '';
+            const email = document.getElementById('email-input').value.trim();
+            const password = document.getElementById('password-input').value.trim();
+            const username = document.getElementById('username-input').value.trim();
+            const age = document.getElementById('age-input').value.trim();
+            const details = document.getElementById('details-input').value.trim();
+
+            if (!email || !password) {
+                statusMessage.innerText = 'Email and password are required.';
+                return;
+            }
+
+            if (isSignUpMode && (!username || !age || !details)) {
+                statusMessage.innerText = 'Username, age, and details are required for signup.';
+                return;
+            }
+
+            try {
+                if (isSignUpMode) {
+                    // Firebase Sign Up
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+
+                    // Save additional details to MongoDB via server API
+                    await saveUserDetails(user.uid, email, username, age, details);
+                    
+                    statusMessage.innerText = 'Signup successful! Redirecting to chat...';
+
+                } else {
+                    // Firebase Log In
+                    await auth.signInWithEmailAndPassword(email, password);
+                    statusMessage.innerText = 'Login successful! Redirecting to chat...';
+                }
+
+                // Redirect on success. index.html will handle fetching the username.
+                window.location.href = 'index.html';
+
+            } catch (error) {
+                console.error("Authentication Error:", error);
+                let errorMessage = 'An authentication error occurred.';
+                if (error.code) {
+                    switch (error.code) {
+                        case 'auth/email-already-in-use': errorMessage = 'This email is already in use.'; break;
+                        case 'auth/invalid-email': errorMessage = 'Invalid email address.'; break;
+                        case 'auth/weak-password': errorMessage = 'Password should be at least 6 characters.'; break;
+                        case 'auth/user-not-found':
+                        case 'auth/wrong-password':
+                        case 'auth/invalid-credential': errorMessage = 'Invalid email or password.'; break;
+                        default: errorMessage = `Error: ${error.message}`;
+                    }
+                }
+                statusMessage.innerText = errorMessage;
+            }
+        }
+    </script>
+
+</body>
+</html>

@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Web Chat with Express and Socket.io",
   "dependencies": {
     "express": "^5.1.0",
+    "mongodb": "^7.0.0",
+    "mongoose": "^8.20.1",
     "socket.io": "^4.8.1"
   }
 }
