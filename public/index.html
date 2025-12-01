@@ -8,18 +8,25 @@
         #chat { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; border: 1px solid #ccc; background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 10px;}
         #chat li { padding: 5px 0; border-bottom: 1px dotted #eee; word-wrap: break-word; }
         #chat li:last-child { border-bottom: none; }
-        .username-msg { font-weight: bold; color: #007bff; margin-right: 5px; }
-        .self-msg { color: #28a745; }
+        .username-msg { font-weight: bold; margin-right: 5px; }
+        .other-msg .username-msg { color: #007bff; }
+        .self-msg { font-weight: bold; } /* Changed self-msg style to bold entire message for emphasis */
+        .self-msg .username-msg { color: #28a745; }
         input#msg { padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: calc(100% - 90px - 15px); margin-right: 10px; }
         button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
         .input-container { display: flex; }
+        #logout-btn { background-color: #dc3545; float: right; margin-left: 10px; }
+        #logout-btn:hover { background-color: #c82333; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1 id="welcome-header">Simple Chat Application</h1>
+        <h1 id="welcome-header">Simple Chat Application 
+            <button id="logout-btn" onclick="logout()">Logout</button>
+        </h1>
+        
         <ul id="chat"></ul>
         <div class="input-container">
             <input id="msg" placeholder="Type message..." onkeypress="if(event.keyCode === 13) send()" />
@@ -28,51 +35,103 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 
     <script>
         let socket;
         let username;
-
-        // --- Initialization ---
-        function getUsernameFromUrl() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('username');
-        }
-
-        window.onload = function() {
-            username = getUsernameFromUrl();
-            
-            if (!username) {
-                // If no username, redirect back to login
-                window.location.href = 'login.html';
-                return;
-            }
-
-            // Update header to welcome the user
-            document.getElementById('welcome-header').innerText = `Welcome, ${username}!`;
-            
-            connectSocket();
+        let currentFirebaseUid;
+        
+        // Your provided Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCpJ1pfkHQXwjOlG7FHeh3XxtxwFkLscI",
+            authDomain: "newapplicatioon.firebaseapp.com",
+            projectId: "newapplicatioon",
+            storageBucket: "newapplicatioon.firebasestorage.app",
+            messagingSenderId: "197141078730",
+            appId: "1:197141078730:web:5440a7bfd71e2a9a92ca33",
+            measurementId: "G-F1FE2F770S"
         };
+        
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // --- Authentication Check & Initialization ---
+        window.onload = function() {
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    // User is signed in.
+                    currentFirebaseUid = user.uid;
+                    fetchUsernameAndConnect(user.uid);
+                } else {
+                    // User is signed out. Redirect to auth page.
+                    console.log('No user logged in. Redirecting.');
+                    window.location.href = 'auth.html';
+                }
+            });
+        };
+
+        async function fetchUsernameAndConnect(uid) {
+            try {
+                // API call to your server to get the username linked to the Firebase UID
+                const response = await fetch(`/api/user/details/${uid}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    username = data.username;
+                    document.getElementById('welcome-header').innerHTML = `Welcome, ${username}! <button id="logout-btn" onclick="logout()">Logout</button>`;
+                    connectSocket();
+                } else {
+                    alert('Error: Could not retrieve your username from the server. Please sign up again.');
+                    auth.signOut();
+                }
+            } catch (error) {
+                console.error("Error fetching username:", error);
+                alert('Connection error with server. Please try again.');
+                auth.signOut();
+            }
+        }
+        
+        function logout() {
+            auth.signOut().then(() => {
+                // onAuthStateChanged listener handles the redirect to auth.html
+                console.log("Logged out successfully.");
+            }).catch((error) => {
+                console.error("Logout Error:", error);
+            });
+        }
         // ----------------------
 
         function connectSocket() {
             socket = io("http://localhost:5000");
 
-            // LISTENER: Handles messages received from OTHERS
+            // LISTENER: Handles message history from MongoDB
+            socket.on("history", (messages) => {
+                const chatWindow = document.getElementById("chat");
+                chatWindow.innerHTML = ''; // Clear existing chat
+                messages.forEach(msg => {
+                    // msg.username is available from MongoDB document
+                    displayMessage(msg.text, msg.username, msg.username === username);
+                });
+            });
+
+            // LISTENER: Handles new messages received from the server (either self or others)
             socket.on("message", (data) => {
-                displayMessage(data.text, data.username, false);
+                // The server broadcasts to everyone, so we check if it's the current user's message
+                displayMessage(data.text, data.username, data.username === username);
             });
         }
 
         function displayMessage(text, sender, isSelf) {
             const li = document.createElement("li");
+            li.className = isSelf ? 'self-msg' : 'other-msg';
+
             const usernameSpan = document.createElement("span");
             usernameSpan.className = 'username-msg';
             usernameSpan.innerText = `${sender}: `;
-
-            if (isSelf) {
-                li.className = 'self-msg';
-            }
 
             li.appendChild(usernameSpan);
             li.append(text);
@@ -95,10 +154,7 @@
                 text: text
             };
 
-            // 1. Display the message immediately for the sender
-            displayMessage(text, username, true);
-            
-            // 2. Emit the message object to the server
+            // Emit the message object to the server
             socket.emit("message", messageData);
             
             // Clear the input field
