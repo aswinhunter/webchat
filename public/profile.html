@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Profile</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            background-color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .profile-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 400px;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        .profile-card h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: -80px auto 20px auto; /* Pulls it up over the card edge */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            overflow: hidden;
+            border: 5px solid white;
+        }
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px dashed #eee;
+            color: #555;
+            font-size: 1.1em;
+        }
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #333;
+        }
+        .detail-value {
+            color: #666;
+        }
+        .action-buttons {
+            margin-top: 30px;
+        }
+        .action-buttons button {
+            width: calc(50% - 10px);
+            padding: 12px 0;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.2s ease;
+            margin: 5px;
+        }
+        .logout-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+        .back-btn {
+            background-color: #6c757d;
+            color: white;
+        }
+        .back-btn:hover {
+            background-color: #5a6268;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="profile-card">
+        <div class="profile-avatar">
+            <img src="/user_profile.png" alt="User Avatar" />
+        </div>
+        <h1>User Profile</h1>
+
+        <div id="profile-details">
+            <div class="detail-item"><span class="detail-label">Username:</span> <span id="profile-username" class="detail-value">Loading...</span></div>
+            <div class="detail-item"><span class="detail-label">Email:</span> <span id="profile-email" class="detail-value">Loading...</span></div>
+            <div class="detail-item"><span class="detail-label">Age:</span> <span id="profile-age" class="detail-value">Loading...</span></div>
+            <div class="detail-item"><span class="detail-label">Details:</span> <span id="profile-additional-details" class="detail-value">Loading...</span></div>
+            <div class="detail-item"><span class="detail-label">Role:</span> <span id="profile-role" class="detail-value">Loading...</span></div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="back-btn" onclick="goBack()">Back to Chat</button>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <script>
+        // Your provided Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCpJ1pfkHQXwjOlG7FHeh3XxtxwFkLscI",
+            authDomain: "newapplicatioon.firebaseapp.com",
+            projectId: "newapplicatioon",
+            storageBucket: "newapplicatioon.firebasestorage.app",
+            messagingSenderId: "197141078730",
+            appId: "1:197141078730:web:5440a7bfd71e2a9a92ca33",
+            measurementId: "G-F1FE2F770S"
+        };
+        
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        window.onload = function() {
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    fetchUserProfile(user.uid);
+                } else {
+                    console.log('No user logged in. Redirecting.');
+                    window.location.href = 'auth.html';
+                }
+            });
+        };
+
+        async function fetchUserProfile(uid) {
+            try {
+                // Fetch ALL user details for the Firebase UID from your server
+                // You'll need to add a new API endpoint in server.js for this (see below)
+                const response = await fetch(`/api/user/full-details/${uid}`);
+                const userData = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('profile-username').innerText = userData.username || 'N/A';
+                    document.getElementById('profile-email').innerText = userData.email || 'N/A';
+                    document.getElementById('profile-age').innerText = userData.age || 'N/A';
+                    document.getElementById('profile-additional-details').innerText = userData.details || 'N/A';
+                    document.getElementById('profile-role').innerText = userData.role || 'N/A';
+                } else {
+                    alert('Error: Could not retrieve user profile from the server.');
+                    // Optionally redirect or show an error
+                }
+            } catch (error) {
+                console.error("Error fetching user profile:", error);
+                alert('Connection error with server. Please try again.');
+            }
+        }
+        
+        function logout() {
+            auth.signOut().then(() => {
+                window.location.href = 'auth.html';
+            }).catch((error) => {
+                console.error("Logout Error:", error);
+            });
+        }
+
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+    </script>
+
+</body>
+</html>
