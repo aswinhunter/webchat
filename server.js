@@ -73,12 +73,31 @@ app.get('/api/user/details/:firebaseUid', async (req, res) => {
     }
 });
 
+app.get('/api/user/full-details/:firebaseUid', async (req, res) => {
+    try {
+        // Fetch all fields except the Mongoose internal metadata
+        const user = await User.findOne({ firebaseUid: req.params.firebaseUid }).select('-__v');
+        if (user) {
+            res.send(user); // Send the full user object
+        } else {
+            res.status(404).send({ message: 'User details not found in MongoDB.' });
+        }
+    } catch (error) {
+        console.error('Error fetching full user details:', error);
+        res.status(500).send({ message: 'Error fetching full user details.', error: error.message });
+    }
+});
+
 // Serve static files (auth.html, index.html, CSS, JS) from the 'public' folder
 app.use(express.static("public"));
 
 // New: Redirect root URL to the authentication page
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/auth.html'); // Now points to auth.html
+});
+
+app.get('/profile', (req, res) => {
+    res.sendFile(__dirname + '/public/profile.html');
 });
 
 
