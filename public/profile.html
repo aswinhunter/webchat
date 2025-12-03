@@ -1,117 +1,298 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>User Profile</title>
+    <title>Edit Profile</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        /* CSS variables for a deep blue/teal theme */
+        :root {
+            --primary-color: #0077b6; /* Deep Blue */
+            --accent-color: #00ADB5;  /* Teal/Cyan */
+            --text-color: #333;
+            --light-bg: #f0f2f5;
+            --separator-color: #e0e0e0;
+        }
+
+        /* General Styles & Body Layout */
         body {
             font-family: 'Roboto', sans-serif;
             margin: 0;
-            background-color: #e0e0e0;
+            background-color: var(--light-bg);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
         }
-        .profile-card {
+        .profile-wrapper {
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             width: 100%;
-            max-width: 400px;
-            padding: 30px;
+            max-width: 500px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Header and Back Button */
+        .header {
+            background-color: var(--primary-color); 
+            color: white;
+            padding: 15px;
             text-align: center;
             position: relative;
         }
-        .profile-card h1 {
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 2em;
+        .back-btn-container {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
         }
-        .profile-avatar {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background-color: #f0f0f0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: -80px auto 20px auto; /* Pulls it up over the card edge */
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        .back-btn-container button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        /* Image Section (Profile Picture) */
+        .image-section {
+            height: 300px;
+            background-color: #ddd;
+            position: relative;
             overflow: hidden;
-            border: 5px solid white;
+            border-bottom: 5px solid var(--accent-color); /* Teal separator */
         }
-        .profile-avatar img {
+        .main-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            /* Placeholder: uses the uploaded user_profile.png */
+            background-image: url('/user_profile.png');
+            background-size: cover;
+            background-position: center;
         }
-        .detail-item {
+        .profile-name-tag {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            font-size: 2em;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        /* Details Section (No more grouping boxes) */
+        .details-section {
+            padding: 30px 20px 10px 20px; /* Reduced bottom padding */
+        }
+        
+        /* Form Row Styles */
+        .form-row {
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px dashed #eee;
-            color: #555;
-            font-size: 1.1em;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--separator-color);
         }
-        .detail-item:last-child {
+        .form-row:last-child {
             border-bottom: none;
         }
-        .detail-label {
-            font-weight: bold;
-            color: #333;
+        .form-row label {
+            font-weight: 500;
+            color: #555;
+            flex-basis: 35%;
         }
-        .detail-value {
-            color: #666;
+        .form-row input:not([type="checkbox"]), .form-row select, .form-row textarea {
+            flex-basis: 60%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1em;
+            box-sizing: border-box;
+            background-color: white;
         }
+        .read-only-email {
+            flex-basis: 60%;
+            padding: 10px 0;
+            color: #888;
+            font-style: italic;
+            font-size: 0.9em;
+            text-align: right;
+        }
+        /* Style for the separate About Me section (no flex) */
+        .about-me-section {
+            padding: 20px 0;
+        }
+        .about-me-section h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        .about-me-section textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1em;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+
+        /* Toggle Switch (for Location) */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-left: auto; 
+        }
+        .switch input { display: none; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        /* Buttons */
         .action-buttons {
-            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 20px;
         }
         .action-buttons button {
-            width: calc(50% - 10px);
-            padding: 12px 0;
+            flex: 1;
+            padding: 15px;
             border: none;
-            border-radius: 25px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 1.1em;
-            transition: background-color 0.2s ease;
-            margin: 5px;
+            font-weight: 700;
+            transition: opacity 0.2s;
         }
-        .logout-btn {
-            background-color: #dc3545;
+        #save-btn {
+            background-color: var(--primary-color); 
             color: white;
         }
-        .logout-btn:hover {
-            background-color: #c82333;
+        #save-btn:hover {
+            opacity: 0.9;
         }
-        .back-btn {
-            background-color: #6c757d;
+        #logout-btn {
+            background-color: #dc3545; 
             color: white;
         }
-        .back-btn:hover {
-            background-color: #5a6268;
+        #logout-btn:hover {
+            opacity: 0.9;
         }
     </style>
 </head>
 <body>
 
-    <div class="profile-card">
-        <div class="profile-avatar">
-            <img src="/user_profile.png" alt="User Avatar" />
+    <div class="profile-wrapper">
+        <div class="header">
+            <div class="back-btn-container">
+                <button onclick="goBack()">&#x25C0;</button> </div>
+            <h2>Edit Your Profile</h2>
         </div>
-        <h1>User Profile</h1>
 
-        <div id="profile-details">
-            <div class="detail-item"><span class="detail-label">Username:</span> <span id="profile-username" class="detail-value">Loading...</span></div>
-            <div class="detail-item"><span class="detail-label">Email:</span> <span id="profile-email" class="detail-value">Loading...</span></div>
-            <div class="detail-item"><span class="detail-label">Age:</span> <span id="profile-age" class="detail-value">Loading...</span></div>
-            <div class="detail-item"><span class="detail-label">Details:</span> <span id="profile-additional-details" class="detail-value">Loading...</span></div>
-            <div class="detail-item"><span class="detail-label">Role:</span> <span id="profile-role" class="detail-value">Loading...</span></div>
+        <div class="image-section">
+            <div class="main-image" id="profile-image"></div>
+            <span class="profile-name-tag" id="profile-username-tag"></span>
+        </div>
+
+        <div class="details-section">
+            
+            <div class="form-row">
+                <label for="input-username">Username:</label>
+                <input id="input-username" type="text" placeholder="Your display name" />
+            </div>
+            <div class="form-row">
+                <label for="input-age">Age:</label>
+                <input id="input-age" type="number" min="18" max="99" placeholder="Your age" />
+            </div>
+            <div class="form-row">
+                <label>Email:</label>
+                <span id="profile-email" class="read-only-email">Loading...</span>
+            </div>
+
+            <div class="form-row">
+                <label for="input-type">Type:</label>
+                <select id="input-type">
+                    <option value="N/A">Select Type</option>
+                    <option value="Otter">Otter</option>
+                    <option value="Bear">Bear</option>
+                    <option value="Cub">Cub</option>
+                    <option value="Wolf">Wolf</option>
+                    <option value="Hunk / Jock">Hunk / Jock</option>
+                    <option value="Geek / Nerd">Geek / Nerd</option>
+                    <option value="Gym Bro">Gym Bro</option>
+                    <option value="Boy-next-door">Boy-next-door</option>
+                    <option value="Drag king">Drag king</option>
+                    <option value="Soft masc">Soft masc</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label for="input-weight">Weight (kg):</label>
+                <input id="input-weight" type="number" min="30" max="200" placeholder="e.g., 75" />
+            </div>
+            
+            <div class="form-row">
+                <label for="input-role">Role:</label>
+                <select id="input-role">
+                    <option value="N/A">Select Role</option>
+                    <option value="Top">Top</option>
+                    <option value="Power Top">Power Top</option>
+                    <option value="Versatile Top">Versatile Top</option>
+                    <option value="Bottom">Bottom</option>
+                    <option value="Power Bottom">Power Bottom</option>
+                    <option value="Versatile Bottom">Versatile Bottom</option>
+                    <option value="Versatile">Versatile</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+            </div>
+            
+            <div class="form-row">
+                <label>Location Toggle:</label>
+                <label class="switch">
+                    <input type="checkbox" id="input-location">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="about-me-section">
+                <h3>About Me</h3>
+                <textarea id="input-about" maxlength="200" placeholder="Tell us about yourself (Max 200 characters)"></textarea>
+            </div>
+
         </div>
 
         <div class="action-buttons">
-            <button class="back-btn" onclick="goBack()">Back to Chat</button>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <button id="save-btn" onclick="saveProfile()">Save Profile</button>
+            <button id="logout-btn" onclick="logout()">Logout</button>
         </div>
     </div>
 
@@ -133,13 +314,14 @@
         // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        let currentFirebaseUid = null;
 
         window.onload = function() {
             auth.onAuthStateChanged(user => {
                 if (user) {
+                    currentFirebaseUid = user.uid;
                     fetchUserProfile(user.uid);
                 } else {
-                    console.log('No user logged in. Redirecting.');
                     window.location.href = 'auth.html';
                 }
             });
@@ -147,27 +329,87 @@
 
         async function fetchUserProfile(uid) {
             try {
-                // Fetch ALL user details for the Firebase UID from your server
-                // You'll need to add a new API endpoint in server.js for this (see below)
+                // Calls the server endpoint
                 const response = await fetch(`/api/user/full-details/${uid}`);
                 const userData = await response.json();
 
                 if (response.ok) {
-                    document.getElementById('profile-username').innerText = userData.username || 'N/A';
+                    // Update header name tag (Read-Only appearance)
+                    document.getElementById('profile-username-tag').innerText = userData.username || 'N/A';
                     document.getElementById('profile-email').innerText = userData.email || 'N/A';
-                    document.getElementById('profile-age').innerText = userData.age || 'N/A';
-                    document.getElementById('profile-additional-details').innerText = userData.details || 'N/A';
-                    document.getElementById('profile-role').innerText = userData.role || 'N/A';
+                    
+                    // Fill input fields with saved data
+                    document.getElementById('input-username').value = userData.username || '';
+                    document.getElementById('input-age').value = userData.age || '';
+                    document.getElementById('input-role').value = userData.role || 'N/A';
+                    document.getElementById('input-weight').value = userData.weight || '';
+                    document.getElementById('input-type').value = userData.type || 'N/A';
+                    document.getElementById('input-about').value = userData.about || '';
+                    document.getElementById('input-location').checked = userData.locationEnabled === true;
                 } else {
                     alert('Error: Could not retrieve user profile from the server.');
-                    // Optionally redirect or show an error
                 }
             } catch (error) {
                 console.error("Error fetching user profile:", error);
-                alert('Connection error with server. Please try again.');
+                alert('Connection error while fetching profile.');
             }
         }
         
+        async function saveProfile() {
+            if (!currentFirebaseUid) {
+                alert("User not authenticated.");
+                return;
+            }
+
+            const weightValue = document.getElementById('input-weight').value;
+            const ageValue = document.getElementById('input-age').value;
+            
+            // Basic Validation
+            if (!document.getElementById('input-username').value.trim()) {
+                alert("Username cannot be empty.");
+                return;
+            }
+            if (!ageValue || parseInt(ageValue) < 18) {
+                 alert("Please enter a valid age (must be 18 or older).");
+                 return;
+            }
+            // Weight is optional, but if entered, must be valid
+            if (weightValue && parseInt(weightValue) <= 0) {
+                 alert("Please enter a valid weight in kg.");
+                 return;
+            }
+
+            const profileData = {
+                username: document.getElementById('input-username').value.trim(),
+                age: parseInt(ageValue),
+                role: document.getElementById('input-role').value,
+                weight: parseInt(weightValue) || null,
+                type: document.getElementById('input-type').value,
+                about: document.getElementById('input-about').value,
+                locationEnabled: document.getElementById('input-location').checked
+            };
+
+            try {
+                const response = await fetch(`/api/user/profile/${currentFirebaseUid}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profileData)
+                });
+
+                if (response.ok) {
+                    alert('Profile updated successfully!');
+                    // Update the chat header name in index.html when returning
+                    fetchUserProfile(currentFirebaseUid); 
+                } else {
+                    const errorData = await response.json();
+                    alert('Failed to save profile: ' + (errorData.message || 'Server error.'));
+                }
+            } catch (error) {
+                console.error("Error saving profile:", error);
+                alert('Network error while saving profile.');
+            }
+        }
+
         function logout() {
             auth.signOut().then(() => {
                 window.location.href = 'auth.html';
