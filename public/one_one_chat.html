@@ -32,10 +32,202 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container" id="lobby-container">
         <h1>1-1 Chat Lobby</h1>
-        <p>This is the placeholder page for listing available users for private text chat.</p>
+        <p>Available users for private text chat:</p>
+        <ul id="user-list" style="list-style:none; padding:0; margin:10px 0; display:flex; flex-direction:column; gap:8px; width:100%; align-items:center; max-width:640px"></ul>
         <p>Go back to the <a href="index.html">Group Chat</a> to continue.</p>
     </div>
+    
+    <!-- Chat UI (replaces placeholder) -->
+    <div class="container" id="dm-container" style="display:none;">
+        <div style="padding: 15px; width: 100%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee;">
+            <a href="index.html">Back</a>
+            <div id="dm-user">Chat</div>
+            <div></div>
+        </div>
+        <ul id="dm-chat" style="list-style:none; padding:15px; flex-grow:1; overflow:auto; margin:0; height:60vh; background:#f8f8f8;"></ul>
+        <div style="display:flex; padding:10px; gap:8px; background:#f0f0f0;">
+            <input id="dm-msg" placeholder="Type a message" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ccc;"/>
+            <button id="dm-send" style="padding:10px 15px; border-radius:8px; background:#007bff; color:white; border:none;">Send</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCpJ1pfkHQXwjOlG7FHeh3XxtxwFkLscI",
+            authDomain: "newapplicatioon.firebaseapp.com",
+            projectId: "newapplicatioon",
+            storageBucket: "newapplicatioon.firebasestorage.app",
+            messagingSenderId: "197141078730",
+            appId: "1:197141078730:web:5440a7bfd71e2a9a92ca33",
+            measurementId: "G-F1FE2F770S"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        let socket;
+        let currentFirebaseUid;
+        let currentUsername;
+        let otherUid;
+        let room;
+
+        function parseQuery() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('uid');
+        }
+
+        function createRoomName(uid1, uid2) {
+            const arr = [uid1, uid2].sort();
+            return `${arr[0]}_${arr[1]}`;
+        }
+
+        window.onload = function() {
+            otherUid = parseQuery();
+                if (!otherUid) {
+                    // show the placeholder listing: fill user list and return
+                    auth.onAuthStateChanged(async (user) => {
+                        if (!user) return window.location.href = 'auth.html';
+                        currentFirebaseUid = user.uid;
+                            try {
+                                const res = await fetch(`/api/dm/peers/${currentFirebaseUid}`);
+                                const peers = await res.json();
+                                const userList = document.getElementById('user-list');
+                                userList.innerHTML = '';
+                                peers.forEach(p => {
+                                    const li = document.createElement('li');
+                                    li.style.width = '100%';
+                                    li.style.display = 'flex';
+                                    li.style.justifyContent = 'center';
+                                    li.style.alignItems = 'center';
+                                    const btn = document.createElement('button');
+                                    btn.style.padding = '10px 16px';
+                                    btn.style.border = '1px solid #ddd';
+                                    btn.style.borderRadius = '8px';
+                                    btn.style.background = '#fff';
+                                    btn.style.width = '100%';
+                                    btn.style.maxWidth = '640px';
+                                    btn.style.cursor = 'pointer';
+                                    // Compose label with name, snippet, and timestamp
+                                    btn.innerHTML = `<div style="display:flex; justify-content:space-between; width:100%;"><div style=\"text-align:left;\"><strong>${p.username}</strong><br/><small style=\"color:#666;\">${p.lastMessage ? (p.lastMessage.length > 36 ? p.lastMessage.slice(0,36) + '...' : p.lastMessage) : ''}</small></div><div style=\"color:#888; font-size:0.8em; text-align:right;\">${new Date(p.timestamp).toLocaleString()}</div></div>`;
+                                    btn.onclick = () => { window.location.href = `one_one_chat.html?uid=${encodeURIComponent(p.uid)}`; };
+                                    li.appendChild(btn);
+                                    userList.appendChild(li);
+                                });
+                        } catch (err) {
+                            console.error('Error fetching users for lobby', err);
+                        }
+                    });
+                    return;
+                }
+            // Show the DM container and hide the lobby
+            document.getElementById('dm-container').style.display = 'flex';
+            document.getElementById('lobby-container').style.display = 'none';
+
+            auth.onAuthStateChanged(async (user) => {
+                if (!user) return window.location.href = 'auth.html';
+                currentFirebaseUid = user.uid;
+                // fetch current username
+                const meResp = await fetch(`/api/user/details/${currentFirebaseUid}`);
+                const meData = await meResp.json();
+                currentUsername = meData.username;
+
+                // fetch other user's display name
+                const othersResp = await fetch(`/api/user/full-details/${otherUid}`);
+                const otherData = await othersResp.json();
+                const displayName = otherData.username || 'Unknown';
+                document.getElementById('dm-user').innerText = displayName;
+
+                // compute the room
+                room = createRoomName(currentFirebaseUid, otherUid);
+
+                // Connect socket
+                socket = io('http://localhost:5000');
+                socket.emit('identify', { firebaseUid: currentFirebaseUid });
+                socket.emit('joinPrivate', { room });
+
+                socket.on('privateMessage', (data) => {
+                    if (data.room !== room) return; // ignore unrelated rooms
+                    displayDM(data.text, data.senderName, data.senderUid === currentFirebaseUid, data.timestamp);
+                });
+
+                // Load history
+                loadDMHistory();
+            });
+        }
+
+        async function loadDMHistory() {
+            try {
+                const res = await fetch(`/api/dm/history/${room}`);
+                const messages = await res.json();
+                const chat = document.getElementById('dm-chat');
+                chat.innerHTML = '';
+                messages.forEach(msg => {
+                    const isSelf = msg.senderUid === currentFirebaseUid;
+                    displayDM(msg.text, msg.senderName, isSelf, msg.timestamp);
+                });
+            } catch (err) {
+                console.error('Error loading DM history', err);
+            }
+        }
+
+        function displayDM(text, sender, isSelf, timestamp) {
+            const chat = document.getElementById('dm-chat');
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.justifyContent = isSelf ? 'flex-end' : 'flex-start';
+            li.style.padding = '6px 0';
+            const bubble = document.createElement('div');
+            bubble.style.maxWidth = '70%';
+            bubble.style.padding = '8px 12px';
+            bubble.style.borderRadius = '14px';
+            bubble.style.background = isSelf ? '#DCF8C6' : '#E2E2E2';
+            bubble.style.color = '#111';
+            bubble.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+            if (!isSelf) {
+                const name = document.createElement('div');
+                name.style.fontWeight = '700';
+                name.style.marginBottom = '6px';
+                name.innerText = sender;
+                bubble.appendChild(name);
+            }
+            bubble.appendChild(document.createTextNode(text));
+            li.appendChild(bubble);
+            // timestamp
+            const tsEl = document.createElement('div');
+            tsEl.style.fontSize = '12px';
+            tsEl.style.color = '#666';
+            tsEl.style.marginTop = '4px';
+            tsEl.style.marginLeft = isSelf ? '8px' : '0';
+            tsEl.style.marginRight = isSelf ? '0' : '8px';
+            tsEl.innerText = timestamp ? new Date(timestamp).toLocaleTimeString() : '';
+            li.appendChild(tsEl);
+            chat.appendChild(li);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        document.getElementById('dm-send').onclick = sendDM;
+        document.getElementById('dm-msg').onkeypress = function(e) { if (e.key === 'Enter') sendDM(); };
+
+        function sendDM() {
+            const input = document.getElementById('dm-msg');
+            const text = input.value.trim();
+            if (!text) return;
+            if (!socket || !room) return;
+
+            const payload = {
+                senderUid: currentFirebaseUid,
+                receiverUid: otherUid,
+                room,
+                senderName: currentUsername,
+                text
+            };
+            socket.emit('privateMessage', payload);
+            input.value = '';
+        }
+    </script>
 </body>
 </html>

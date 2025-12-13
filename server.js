@@ -205,11 +205,13 @@ const createRoomName = (uid1, uid2) => {
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    // Track the Firebase UID for each socket for simple auth checks
     socket.on('identify', (data) => {
         const { firebaseUid } = data;
         if (firebaseUid) {
-            socket.join(firebaseUid); 
-            console.log(`User ${firebaseUid} identified and joined room.`);
+            socket.firebaseUid = firebaseUid;
+            socket.join(firebaseUid); // personal channel
+            console.log(`User ${firebaseUid} identified and joined personal room.`);
         }
     });
 
@@ -230,10 +232,45 @@ io.on("connection", (socket) => {
         io.emit("message", data); 
     });
 
-    // Private Chat Messaging (Placeholder/Future Use)
+    // Private Chat Messaging: Join room & forward
+    socket.on('joinPrivate', (data) => {
+        const { room } = data;
+        if (!room) return;
+        socket.join(room);
+        console.log(`Socket ${socket.id} joined private room ${room}`);
+    });
+
     socket.on("privateMessage", async (data) => {
-        const { senderUid, receiverUid } = data;
-        console.log(`Received potential DM from ${senderUid} to ${receiverUid}. (Logic currently placeholder)`);
+        const { senderUid, receiverUid, room, senderName, text } = data;
+
+        // Basic server-side verification: ensure the socket's firebaseUid matches the senderUid.
+        if (!socket.firebaseUid || socket.firebaseUid !== senderUid) {
+            console.warn(`Socket verification failed. socket.firebaseUid=${socket.firebaseUid} senderUid=${senderUid}`);
+            return;
+        }
+
+        try {
+            const newPrivate = new PrivateMessage({
+                senderUid,
+                receiverUid,
+                room,
+                senderName,
+                text
+            });
+            await newPrivate.save();
+
+            // Emit only to the private room
+            io.to(room).emit("privateMessage", {
+                senderUid,
+                receiverUid,
+                room,
+                senderName,
+                text,
+                timestamp: newPrivate.timestamp
+            });
+        } catch (error) {
+            console.error('Error saving private message to MongoDB:', error);
+        }
     });
 
     socket.on("disconnect", () => {
@@ -264,4 +301,39 @@ app.get('/one_one_vc.html', (req, res) => {
 
 http.listen(5000, "0.0.0.0", () => {
     console.log("Server running on http://localhost:5000");
+});
+
+// 6b. Fetch DM peers for a user: return peers who sent/received messages with the given UID
+app.get('/api/dm/peers/:firebaseUid', async (req, res) => {
+    try {
+        const uid = req.params.firebaseUid;
+        // Pull messages where the user is sender or receiver
+        const messages = await PrivateMessage.find({ $or: [{ senderUid: uid }, { receiverUid: uid }] }).sort({ timestamp: -1 }).limit(1000);
+
+        // Build map of peerUid -> latest message and timestamp
+        const peersMap = {};
+        messages.forEach(msg => {
+            const peerUid = msg.senderUid === uid ? msg.receiverUid : msg.senderUid;
+            if (!peersMap[peerUid] || new Date(msg.timestamp) > new Date(peersMap[peerUid].timestamp)) {
+                peersMap[peerUid] = { lastMessage: msg.text, timestamp: msg.timestamp };
+            }
+        });
+
+        // Convert to array and populate with username
+        const peerUids = Object.keys(peersMap);
+        const users = await User.find({ firebaseUid: { $in: peerUids } }).select('firebaseUid username -_id');
+        const usersMap = users.reduce((m, u) => { m[u.firebaseUid] = u.username; return m; }, {});
+
+        const peers = peerUids.map(uid => ({
+            uid,
+            username: usersMap[uid] || 'Unknown',
+            lastMessage: peersMap[uid].lastMessage,
+            timestamp: peersMap[uid].timestamp
+        })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        res.send(peers);
+    } catch (error) {
+        console.error('Error fetching DM peers:', error);
+        res.status(500).send({ message: 'Error fetching DM peers.', error: error.message });
+    }
 });

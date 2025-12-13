@@ -263,9 +263,9 @@
                     // Alignment relies on the firebaseUid
                     const isSelf = msg.firebaseUid === currentFirebaseUid;
                     // NAME LOOKUP: Use the userMap to get the CURRENT name for the sender's UID
-                    const displaySender = userMap[msg.firebaseUid] || msg.username; 
-                    
-                    displayMessage(msg.text, displaySender, isSelf);
+                    const displaySender = userMap[msg.firebaseUid] || msg.username;
+
+                    displayMessage(msg.text, displaySender, isSelf, msg.firebaseUid);
                 });
 
             } catch (error) {
@@ -287,11 +287,11 @@
                 const isSelf = data.firebaseUid === currentFirebaseUid;
                 const displaySender = userMap[data.firebaseUid] || data.username; 
 
-                displayMessage(data.text, displaySender, isSelf);
+                displayMessage(data.text, displaySender, isSelf, data.firebaseUid);
             });
         }
         
-        function displayMessage(text, sender, isSelf) {
+        function displayMessage(text, sender, isSelf, uid) {
             const li = document.createElement("li");
             li.className = isSelf ? 'self-msg' : 'other-msg';
 
@@ -301,6 +301,14 @@
             const usernameSpan = document.createElement("span");
             usernameSpan.className = 'username-msg';
             usernameSpan.innerText = `${sender}: `;
+            if (uid && !isSelf) {
+                usernameSpan.classList.add('clickable-username');
+                usernameSpan.dataset.uid = uid;
+                usernameSpan.onclick = function() {
+                    // Open a one-to-one chat with the clicked user
+                    window.location.href = `one_one_chat.html?uid=${encodeURIComponent(uid)}`;
+                };
+            }
 
             messageContent.appendChild(usernameSpan);
             messageContent.append(text);
