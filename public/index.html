@@ -224,21 +224,44 @@
 
         async function fetchUsernameAndConnect(uid) {
             try {
-                const response = await fetch(`/api/user/details/${uid}`);
-                const data = await response.json();
+                const userResponse = await fetch(`/api/user/details/${uid}`);
+                const userData = await userResponse.json();
 
-                if (response.ok) {
-                    username = data.username;
+                if (userResponse.ok) {
+                    username = userData.username;
                     document.getElementById('welcome-header').innerHTML = `Welcome, ${username}!`; 
-                    connectSocket();
+                    
+                    await fetchHistory(); // <--- NEW: Load history immediately after authentication
+                    connectSocket(); // Connect WebSocket for live updates
                 } else {
                     alert('Error: Could not retrieve your username from the server. Please ensure you completed signup.');
                     auth.signOut();
                 }
             } catch (error) {
-                console.error("Error fetching username:", error);
+                console.error("Error fetching data:", error);
                 alert('Connection error with server. Please ensure your Node.js server is running and accessible.');
                 auth.signOut();
+            }
+        }
+        
+        // NEW: Function to fetch history via API
+        async function fetchHistory() {
+            try {
+                const historyResponse = await fetch('/api/group/history');
+                const messages = await historyResponse.json();
+
+                const chatWindow = document.getElementById("chat");
+                chatWindow.innerHTML = ''; // Clear chat before loading history
+                
+                messages.forEach(msg => {
+                    // Alignment now relies on the firebaseUid saved with the message
+                    const isSelf = msg.firebaseUid === currentFirebaseUid;
+                    displayMessage(msg.text, msg.username, isSelf);
+                });
+
+            } catch (error) {
+                console.error("Error fetching chat history:", error);
+                // Non-fatal error, continue application.
             }
         }
         
@@ -246,7 +269,7 @@
             window.location.href = 'profile.html';
         }
 
-        // NOTE: The startDm function is not needed here as the 1-1 Chat tab will handle listing users.
+        // Removed startDm functionality since 1-1 chat will be handled by the dedicated page
 
         function connectSocket() {
             socket = io("http://localhost:5000");
@@ -254,16 +277,12 @@
             // Identify the user to the server so it can track their socket for DMs
             socket.emit('identify', { firebaseUid: currentFirebaseUid });
 
-            socket.on("history", (messages) => {
-                const chatWindow = document.getElementById("chat");
-                chatWindow.innerHTML = '';
-                messages.forEach(msg => {
-                    displayMessage(msg.text, msg.username, msg.username === username);
-                });
-            });
+            // The history event is no longer used, as we fetch history via API on load.
 
             socket.on("message", (data) => {
-                displayMessage(data.text, data.username, data.username === username);
+                // Real-time message: Alignment uses the UID sent in the payload
+                const isSelf = data.firebaseUid === currentFirebaseUid;
+                displayMessage(data.text, data.username, isSelf);
             });
         }
         
@@ -277,8 +296,6 @@
             const usernameSpan = document.createElement("span");
             usernameSpan.className = 'username-msg';
             usernameSpan.innerText = `${sender}: `;
-
-            // Removed clickable username logic for now, as user list will be on the 1-1 Chat page
 
             messageContent.appendChild(usernameSpan);
             messageContent.append(text);
@@ -299,7 +316,8 @@
 
             const messageData = {
                 username: username,
-                text: text
+                text: text,
+                firebaseUid: currentFirebaseUid // Crucial for real-time and DB saving
             };
 
             socket.emit("message", messageData);
