@@ -46,18 +46,18 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema);
 
-// MessageSchema for GROUP CHAT (FIXED: Added firebaseUid for persistence)
+// MessageSchema for GROUP CHAT (Includes firebaseUid for efficient name lookup)
 const MessageSchema = new mongoose.Schema({
     username: { type: String, required: true },
     text: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
-    firebaseUid: { type: String, required: true } // Must be present for correct history alignment
+    firebaseUid: { type: String, required: true } 
 });
 
 const Message = mongoose.model('Message', MessageSchema);
 
 
-// NEW: Schema for PRIVATE CHAT MESSAGES
+// PrivateMessageSchema (Placeholder/Future Use)
 const PrivateMessageSchema = new mongoose.Schema({
     senderUid: { type: String, required: true },
     receiverUid: { type: String, required: true },
@@ -72,11 +72,11 @@ const PrivateMessage = mongoose.model('PrivateMessage', PrivateMessageSchema);
 
 // --- Express API Routes ---
 
-// 1. Save initial user details (FIXED)
+// 1. Save initial user details
 app.post('/api/user/signup', async (req, res) => {
     const { firebaseUid, username, age, details, email } = req.body;
     try {
-        const newUser = new User({ firebaseUid, username, age, details: details || '', email }); 
+        const newUser = new User({ firebaseUid, username, age, details: details || '', email });
         await newUser.save();
         res.status(201).send({ message: 'User details saved successfully.' });
     } catch (error) {
@@ -85,7 +85,7 @@ app.post('/api/user/signup', async (req, res) => {
     }
 });
 
-// 2. Fetch current username 
+// 2. Fetch current username
 app.get('/api/user/details/:firebaseUid', async (req, res) => {
     try {
         const user = await User.findOne({ firebaseUid: req.params.firebaseUid }).select('username');
@@ -151,7 +151,7 @@ app.get('/api/user/uid-by-name/:username', async (req, res) => {
     }
 });
 
-// 6. Fetch Private Message History
+// 6. Fetch Private Message History (Placeholder)
 app.get('/api/dm/history/:room', async (req, res) => {
     try {
         const messages = await PrivateMessage.find({ room: req.params.room })
@@ -164,7 +164,7 @@ app.get('/api/dm/history/:room', async (req, res) => {
     }
 });
 
-// 7. NEW: API endpoint to fetch Group Chat History (used by index.html onload)
+// 7. API endpoint to fetch Group Chat History (used by index.html onload)
 app.get('/api/group/history', async (req, res) => {
     try {
         const messages = await Message.find().sort({ timestamp: 1 }).limit(100);
@@ -174,6 +174,26 @@ app.get('/api/group/history', async (req, res) => {
         res.status(500).send({ message: 'Error fetching group chat history.', error: error.message });
     }
 });
+
+// 8. NEW: API endpoint to fetch name map (low computation lookup)
+app.get('/api/users/name-map', async (req, res) => {
+    try {
+        // Only fetching the UID and current username from the small User collection
+        const users = await User.find({}).select('firebaseUid username -_id');
+        
+        // Convert the list into an easy-to-use map: { "uid1": "name1", "uid2": "name2", ... }
+        const userMap = users.reduce((map, user) => {
+            map[user.firebaseUid] = user.username;
+            return map;
+        }, {});
+        
+        res.send(userMap);
+    } catch (error) {
+        console.error('Error fetching current usernames map:', error);
+        res.status(500).send({ message: 'Error fetching current usernames.', error: error.message });
+    }
+});
+
 
 // --- Socket.io Chat Logic ---
 
@@ -195,7 +215,6 @@ io.on("connection", (socket) => {
 
     // Group Chat Messaging (index.html)
     socket.on("message", async (data) => {
-        // FIX: Ensure firebaseUid is available on incoming data
         const { username, text, firebaseUid } = data;
         try {
             const newMessage = new Message({
@@ -211,28 +230,10 @@ io.on("connection", (socket) => {
         io.emit("message", data); 
     });
 
-    // Private Chat Messaging (dm_chat.html)
+    // Private Chat Messaging (Placeholder/Future Use)
     socket.on("privateMessage", async (data) => {
-        const { senderUid, receiverUid, senderName, text } = data;
-        const room = createRoomName(senderUid, receiverUid);
-
-        // 1. Save the private message
-        try {
-            const newPrivateMessage = new PrivateMessage({
-                senderUid,
-                receiverUid,
-                room,
-                senderName,
-                text
-            });
-            await newPrivateMessage.save();
-        } catch (error) {
-            console.error('Error saving private message to MongoDB:', error);
-        }
-        
-        // 2. Emit the message to both the sender and the receiver's rooms
-        io.to(senderUid).emit("privateMessage", data);
-        io.to(receiverUid).emit("privateMessage", data);
+        const { senderUid, receiverUid } = data;
+        console.log(`Received potential DM from ${senderUid} to ${receiverUid}. (Logic currently placeholder)`);
     });
 
     socket.on("disconnect", () => {

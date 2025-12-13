@@ -197,6 +197,7 @@
         let socket;
         let username;
         let currentFirebaseUid;
+        let userMap = {}; // NEW: Global cache for UID -> Current Username lookup
         
         const firebaseConfig = {
             apiKey: "AIzaSyDCpJ1pfkHQXwjOlG7FHeh3XxtxwFkLscI",
@@ -215,15 +216,20 @@
             auth.onAuthStateChanged(user => {
                 if (user) {
                     currentFirebaseUid = user.uid;
-                    fetchUsernameAndConnect(user.uid);
+                    fetchUserDataAndConnect(user.uid); 
                 } else {
                     window.location.href = 'auth.html';
                 }
             });
         };
 
-        async function fetchUsernameAndConnect(uid) {
+        async function fetchUserDataAndConnect(uid) {
             try {
+                // 1. Fetch current usernames map for ALL users (Low-cost operation)
+                const mapResponse = await fetch('/api/users/name-map');
+                userMap = await mapResponse.json();
+
+                // 2. Fetch current user's details
                 const userResponse = await fetch(`/api/user/details/${uid}`);
                 const userData = await userResponse.json();
 
@@ -231,8 +237,8 @@
                     username = userData.username;
                     document.getElementById('welcome-header').innerHTML = `Welcome, ${username}!`; 
                     
-                    await fetchHistory(); // <--- NEW: Load history immediately after authentication
-                    connectSocket(); // Connect WebSocket for live updates
+                    await fetchHistory(); // Load history using the now-available userMap
+                    connectSocket(); 
                 } else {
                     alert('Error: Could not retrieve your username from the server. Please ensure you completed signup.');
                     auth.signOut();
@@ -244,24 +250,26 @@
             }
         }
         
-        // NEW: Function to fetch history via API
+        // Function to fetch history via API
         async function fetchHistory() {
             try {
                 const historyResponse = await fetch('/api/group/history');
                 const messages = await historyResponse.json();
 
                 const chatWindow = document.getElementById("chat");
-                chatWindow.innerHTML = ''; // Clear chat before loading history
+                chatWindow.innerHTML = '';
                 
                 messages.forEach(msg => {
-                    // Alignment now relies on the firebaseUid saved with the message
+                    // Alignment relies on the firebaseUid
                     const isSelf = msg.firebaseUid === currentFirebaseUid;
-                    displayMessage(msg.text, msg.username, isSelf);
+                    // NAME LOOKUP: Use the userMap to get the CURRENT name for the sender's UID
+                    const displaySender = userMap[msg.firebaseUid] || msg.username; 
+                    
+                    displayMessage(msg.text, displaySender, isSelf);
                 });
 
             } catch (error) {
                 console.error("Error fetching chat history:", error);
-                // Non-fatal error, continue application.
             }
         }
         
@@ -269,20 +277,17 @@
             window.location.href = 'profile.html';
         }
 
-        // Removed startDm functionality since 1-1 chat will be handled by the dedicated page
-
         function connectSocket() {
             socket = io("http://localhost:5000");
 
-            // Identify the user to the server so it can track their socket for DMs
             socket.emit('identify', { firebaseUid: currentFirebaseUid });
 
-            // The history event is no longer used, as we fetch history via API on load.
-
             socket.on("message", (data) => {
-                // Real-time message: Alignment uses the UID sent in the payload
+                // Real-time message: Use the UID in the payload to lookup the current name
                 const isSelf = data.firebaseUid === currentFirebaseUid;
-                displayMessage(data.text, data.username, isSelf);
+                const displaySender = userMap[data.firebaseUid] || data.username; 
+
+                displayMessage(data.text, displaySender, isSelf);
             });
         }
         
@@ -315,10 +320,13 @@
             if (text === "") return;
 
             const messageData = {
-                username: username,
+                username: username, // Sends the CURRENT username (for the DB record)
                 text: text,
-                firebaseUid: currentFirebaseUid // Crucial for real-time and DB saving
+                firebaseUid: currentFirebaseUid // Crucial for lookup/alignment
             };
+            
+            // OPTIONAL CLIENT-SIDE CACHE UPDATE: Ensure your local map is up-to-date instantly
+            userMap[currentFirebaseUid] = username;
 
             socket.emit("message", messageData);
             inputElement.value = "";
