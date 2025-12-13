@@ -240,20 +240,22 @@
         }
 
         function connectSocket() {
-            socket = io("http://localhost:5000");
+            socket = io("http://localhost:5000");
 
-            socket.on("history", (messages) => {
-                const chatWindow = document.getElementById("chat");
-                chatWindow.innerHTML = '';
-                messages.forEach(msg => {
-                    displayMessage(msg.text, msg.username, msg.username === username);
-                });
-            });
+            socket.on("history", (messages) => {
+                const chatWindow = document.getElementById("chat");
+                chatWindow.innerHTML = '';
+                messages.forEach(msg => {
+                    // NEW: Compare by permanent UID
+                    displayMessage(msg.text, msg.username, msg.firebaseUid === currentFirebaseUid);
+                });
+            });
 
-            socket.on("message", (data) => {
-                displayMessage(data.text, data.username, data.username === username);
-            });
-        }
+            socket.on("message", (data) => {
+                // NEW: Compare by permanent UID
+                displayMessage(data.text, data.username, data.firebaseUid === currentFirebaseUid);
+            });
+        }
 
         function displayMessage(text, sender, isSelf) {
             const li = document.createElement("li");
@@ -277,21 +279,22 @@
         }
 
         function send() {
-            if (!socket || !username) return;
+            if (!socket || !username) return;
 
-            const inputElement = document.getElementById("msg");
-            const text = inputElement.value.trim();
+            const inputElement = document.getElementById("msg");
+            const text = inputElement.value.trim();
 
-            if (text === "") return;
+            if (text === "") return;
 
-            const messageData = {
-                username: username,
-                text: text
-            };
+            const messageData = {
+                username: username,
+                text: text,
+                firebaseUid: currentFirebaseUid // <--- NEW: Send the UID
+            };
 
-            socket.emit("message", messageData);
-            inputElement.value = "";
-        }
+            socket.emit("message", messageData);
+            inputElement.value = "";
+        }
     </script>
 
 </body>

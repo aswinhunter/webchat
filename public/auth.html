@@ -19,8 +19,8 @@
 
         <div id="signup-fields">
             <input id="username-input" type="text" placeholder="Username (Required for Signup)" maxlength="15" />
-            <input id="age-input" type="number" placeholder="Age (Required for Signup)" min="1" />
-            <input id="details-input" type="text" placeholder="Details (Required for Signup)" />
+            <input id="age-input" type="number" placeholder="Age (Required for Signup)" min="10" />
+
         </div>
 
         <input id="email-input" type="email" placeholder="Gmail (Email)" />
@@ -85,14 +85,14 @@
             const password = document.getElementById('password-input').value.trim();
             const username = document.getElementById('username-input').value.trim();
             const age = document.getElementById('age-input').value.trim();
-            const details = document.getElementById('details-input').value.trim();
+            
 
             if (!email || !password) {
                 statusMessage.innerText = 'Email and password are required.';
                 return;
             }
 
-            if (isSignUpMode && (!username || !age || !details)) {
+            if (isSignUpMode && (!username || !age )) {
                 statusMessage.innerText = 'Username, age, and details are required for signup.';
                 return;
             }
@@ -104,7 +104,7 @@
                     const user = userCredential.user;
 
                     // Save additional details to MongoDB via server API
-                    await saveUserDetails(user.uid, email, username, age, details);
+                    await saveUserDetails(user.uid, email, username, age);
                     
                     statusMessage.innerText = 'Signup successful! Redirecting to chat...';
 

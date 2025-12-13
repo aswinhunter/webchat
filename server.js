@@ -1,4 +1,3 @@
-// aswinhunter/webchat/aswinhunter-webchat-f7d516a22a34b30729574ab214798521b7686c74/server.js (UPDATED)
 const express = require("express");
 const app = express();
 const http = require("http").Server(app);
@@ -13,8 +12,8 @@ const mongoose = require('mongoose');
 app.use(express.json()); 
 
 // --- MongoDB Configuration ---
+// NOTE: Ensure your MONGO_URI uses the correct credentials and database name (chat_db)
 const MONGO_URI = "mongodb+srv://aswinmurugan2712_db_user:Aswin2712@aswincluster.yii7zis.mongodb.net/chat_db?retryWrites=true&w=majority";
-// !! IMPORTANT: Replace the placeholder above with your actual MongoDB Atlas connection string !!
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('MongoDB Atlas connected successfully.'))
@@ -22,30 +21,48 @@ mongoose.connect(MONGO_URI)
 
 // --- Mongoose Schemas and Models ---
 
-// Schema for storing extra user details linked to Firebase UID
+// Schema for storing user details (EXPANDED FOR DATING APP PROFILE)
 const UserSchema = new mongoose.Schema({
-    firebaseUid: { type: String, required: true, unique: true }, // The ID from Firebase Auth
+    firebaseUid: { type: String, required: true, unique: true }, 
     username: { type: String, required: true }, 
-    age: { type: Number },
-    details: { type: String },
-    email: { type: String, required: true, unique: true }
+    age: { type: Number }, // Used as a generic initial detail field
+    email: { type: String, required: true, unique: true },
+    
+    // Updated Dating Profile Fields:
+    role: { 
+        type: String, 
+        enum: ['Top', 'Bottom', 'Versatile', 'Versatile Top', 'Versatile Bottom', 'Power Top', 'Power Bottom', 'Prefer not to say', 'N/A'], 
+        default: 'N/A' 
+    },
+    weight: { type: Number }, // in kg
+    type: { 
+        type: String, 
+        enum: ['Otter', 'Bear', 'Cub', 'Wolf', 'Hunk / Jock', 'Geek / Nerd', 'Gym Bro', 'Boy-next-door', 'Drag king', 'Soft masc', 'Prefer not to say', 'N/A'], 
+        default: 'N/A' 
+    }, 
+    about: { type: String, maxlength: 200 }, // Max length is 200 characters
+    // Placeholders for future logic
+    hasImage: { type: Boolean, default: false },
+    locationEnabled: { type: Boolean, default: false }
+    
 }, { timestamps: true });
 
 const User = mongoose.model('User', UserSchema);
 
-// Schema for storing chat messages
+// Schema for storing chat messages (Remains unchanged)
 const MessageSchema = new mongoose.Schema({
     username: { type: String, required: true },
     text: { type: String, required: true },
-    timestamp: { type: Date, default: Date.now }
+    timestamp: { type: Date, default: Date.now },
+    firebaseUid: { type: String, required: true }
 });
 
 const Message = mongoose.model('Message', MessageSchema);
 
 
-// --- Express API Routes for Firebase Integration ---
+// --- Express API Routes for Firebase and MongoDB ---
 
-// 1. Save additional user details after Firebase signup (Called from auth.html)
+// 1. Save initial user details (Used by auth.html - UNCHANGED)
 app.post('/api/user/signup', async (req, res) => {
     const { firebaseUid, username, age, details, email } = req.body;
     try {
@@ -58,7 +75,7 @@ app.post('/api/user/signup', async (req, res) => {
     }
 });
 
-// 2. Fetch username for the authenticated Firebase UID (Called from index.html)
+// 2. Fetch username (Used by index.html header - UNCHANGED)
 app.get('/api/user/details/:firebaseUid', async (req, res) => {
     try {
         const user = await User.findOne({ firebaseUid: req.params.firebaseUid }).select('username');
@@ -73,12 +90,13 @@ app.get('/api/user/details/:firebaseUid', async (req, res) => {
     }
 });
 
+// 3. Fetch ALL user details (Used by profile.html - Read - UNCHANGED)
 app.get('/api/user/full-details/:firebaseUid', async (req, res) => {
     try {
         // Fetch all fields except the Mongoose internal metadata
         const user = await User.findOne({ firebaseUid: req.params.firebaseUid }).select('-__v');
         if (user) {
-            res.send(user); // Send the full user object
+            res.send(user); 
         } else {
             res.status(404).send({ message: 'User details not found in MongoDB.' });
         }
@@ -88,12 +106,42 @@ app.get('/api/user/full-details/:firebaseUid', async (req, res) => {
     }
 });
 
+// 4. Update profile details (Used by profile.html - Write)
+app.put('/api/user/profile/:firebaseUid', async (req, res) => {
+    // Now including username and age for update
+    const { username, age, role, weight, type, about, locationEnabled } = req.body;
+    try {
+        const updatedUser = await User.findOneAndUpdate(
+            { firebaseUid: req.params.firebaseUid },
+            { 
+                username: username, // Now editable
+                age: age,           // Now editable
+                role: role, 
+                weight: weight, 
+                type: type, 
+                about: about, 
+                locationEnabled: locationEnabled 
+            },
+            { new: true, runValidators: true } // Return the new document and run schema validation
+        );
+
+        if (updatedUser) {
+            res.send({ message: 'Profile updated successfully!', user: updatedUser });
+        } else {
+            res.status(404).send({ message: 'User not found.' });
+        }
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).send({ message: 'Error updating profile.', error: error.message });
+    }
+});
+
 // Serve static files (auth.html, index.html, CSS, JS) from the 'public' folder
 app.use(express.static("public"));
 
-// New: Redirect root URL to the authentication page
+// Redirect root URL to the authentication page
 app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/public/auth.html'); // Now points to auth.html
+    res.sendFile(__dirname + '/public/auth.html'); 
 });
 
 app.get('/profile', (req, res) => {
@@ -101,11 +149,11 @@ app.get('/profile', (req, res) => {
 });
 
 
-// --- Socket.io Chat Logic (Modified to store and serve history) ---
+// --- Socket.io Chat Logic (Unchanged) ---
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    // New: Fetch and emit message history upon connection
+    // Fetch and emit message history upon connection
     Message.find().sort({ timestamp: 1 }).limit(100).then(messages => {
         socket.emit('history', messages); // Emit 'history' event to the connecting user
     }).catch(err => console.error("Error fetching history:", err));
@@ -116,7 +164,8 @@ io.on("connection", (socket) => {
         try {
             const newMessage = new Message({
                 username: data.username,
-                text: data.text
+                text: data.text,
+                firebaseUid: data.firebaseUid
             });
             await newMessage.save();
         } catch (error) {
@@ -132,6 +181,6 @@ io.on("connection", (socket) => {
     });
 });
 
-http.listen(5000, () => {
+http.listen(5000,"0.0.0.0", () => {
     console.log("Server running on http://localhost:5000");
 });
