@@ -148,6 +148,14 @@ app.get('/profile', (req, res) => {
     res.sendFile(__dirname + '/public/profile.html');
 });
 
+app.get('/one_one_chat', (req, res) => {
+    res.sendFile(__dirname + '/public/one_one_chat.html');
+});
+
+app.get('/one_one_vc', (req, res) => {
+    res.sendFile(__dirname + '/public/one_one_vc.html');
+});
+
 
 // --- Socket.io Chat Logic (Unchanged) ---
 io.on("connection", (socket) => {
