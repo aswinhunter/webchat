@@ -25,8 +25,7 @@ mongoose.connect(MONGO_URI)
 const UserSchema = new mongoose.Schema({
     firebaseUid: { type: String, required: true, unique: true }, 
     username: { type: String, required: true }, 
-    age: { type: Number },
-    details: { type: String }, // Used as a generic initial detail field
+    age: { type: Number }, // Used as a generic initial detail field
     email: { type: String, required: true, unique: true },
     
     // Updated Dating Profile Fields:
@@ -182,6 +181,6 @@ io.on("connection", (socket) => {
     });
 });
 
-http.listen(5000, () => {
+http.listen(5000,"0.0.0.0", () => {
     console.log("Server running on http://localhost:5000");
 });
