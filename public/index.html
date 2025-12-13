@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat</title>
+    <title>Group Chat</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body { 
@@ -65,13 +65,37 @@
             transform: translateY(-50%);
             z-index: 11;
         }
-        /* Assuming you put an image named user_profile.png in the public folder */
         .profile-icon img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
+        /* NEW: Navigation Bar Styling */
+        .chat-nav {
+            display: flex;
+            justify-content: space-around;
+            background-color: #f0f0f0;
+            padding: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .chat-nav a {
+            text-decoration: none;
+            color: #555;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .chat-nav a:hover {
+            background-color: #ddd;
+        }
+        .chat-nav .active {
+            background-color: #007bff;
+            color: white;
+            pointer-events: none; /* Disable clicking the current tab */
+        }
+        
         #chat { 
             list-style: none; 
             padding: 20px; 
@@ -86,8 +110,6 @@
             display: flex;
             align-items: flex-start;
         }
-
-        /* --- Message Alignment & Styling --- */
         .message-content {
             padding: 8px 12px;
             border-radius: 18px;
@@ -96,35 +118,16 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             line-height: 1.4;
         }
-
-        /* Your Messages (Self) - ALIGN RIGHT */
-        .self-msg {
-            justify-content: flex-end; 
+        .self-msg { justify-content: flex-end; }
+        .self-msg .message-content { background-color: #DCF8C6; color: #111; }
+        .other-msg { justify-content: flex-start; }
+        .other-msg .message-content { background-color: #E2E2E2; color: #111; }
+        .username-msg { font-weight: bold; margin-right: 8px; color: #007bff; }
+        .self-msg .username-msg { color: #28a745; }
+        .clickable-username {
+            cursor: pointer;
+            text-decoration: underline;
         }
-        .self-msg .message-content {
-            background-color: #DCF8C6; 
-            color: #111;
-        }
-
-        /* Other User Messages (Other) - ALIGN LEFT */
-        .other-msg {
-            justify-content: flex-start; 
-        }
-        .other-msg .message-content {
-            background-color: #E2E2E2; 
-            color: #111;
-        }
-        
-        .username-msg { 
-            font-weight: bold; 
-            margin-right: 8px; 
-            color: #007bff; 
-        }
-        .self-msg .username-msg {
-            color: #28a745; 
-        }
-        /* --- End Message Alignment & Styling --- */
-
 
         .input-area { 
             padding: 15px 20px; 
@@ -132,7 +135,6 @@
             border-top: 1px solid #ddd;
             display: flex;
             align-items: center;
-            /* Input is now correctly placed at the bottom */
             z-index: 10;
         }
         input#msg { 
@@ -171,6 +173,14 @@
             </div>
         </div>
         
+        <!-- NEW: Navigation Bar -->
+        <div class="chat-nav">
+            <a href="index.html" class="active">Group Chat</a>
+            <a href="one_one_chat.html">1-1 Chat</a>
+            <a href="one_one_vc.html">1-1 VC</a>
+        </div>
+        <!-- END NEW: Navigation Bar -->
+        
         <ul id="chat"></ul>
 
         <div class="input-area">
@@ -187,8 +197,8 @@
         let socket;
         let username;
         let currentFirebaseUid;
+        let userMap = {}; // NEW: Global cache for UID -> Current Username lookup
         
-        // Your provided Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDCpJ1pfkHQXwjOlG7FHeh3XxtxwFkLscI",
             authDomain: "newapplicatioon.firebaseapp.com",
@@ -199,7 +209,6 @@
             measurementId: "G-F1FE2F770S"
         };
         
-        // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
 
@@ -207,31 +216,60 @@
             auth.onAuthStateChanged(user => {
                 if (user) {
                     currentFirebaseUid = user.uid;
-                    fetchUsernameAndConnect(user.uid);
+                    fetchUserDataAndConnect(user.uid); 
                 } else {
                     window.location.href = 'auth.html';
                 }
             });
         };
 
-        async function fetchUsernameAndConnect(uid) {
+        async function fetchUserDataAndConnect(uid) {
             try {
-                const response = await fetch(`/api/user/details/${uid}`);
-                const data = await response.json();
+                // 1. Fetch current usernames map for ALL users (Low-cost operation)
+                const mapResponse = await fetch('/api/users/name-map');
+                userMap = await mapResponse.json();
 
-                if (response.ok) {
-                    username = data.username;
-                    // Update header to center the welcome message
+                // 2. Fetch current user's details
+                const userResponse = await fetch(`/api/user/details/${uid}`);
+                const userData = await userResponse.json();
+
+                if (userResponse.ok) {
+                    username = userData.username;
                     document.getElementById('welcome-header').innerHTML = `Welcome, ${username}!`; 
-                    connectSocket();
+                    
+                    await fetchHistory(); // Load history using the now-available userMap
+                    connectSocket(); 
                 } else {
-                    alert('Error: Could not retrieve your username from the server. Please sign up again.');
+                    alert('Error: Could not retrieve your username from the server. Please ensure you completed signup.');
                     auth.signOut();
                 }
             } catch (error) {
-                console.error("Error fetching username:", error);
-                alert('Connection error with server. Please try again.');
+                console.error("Error fetching data:", error);
+                alert('Connection error with server. Please ensure your Node.js server is running and accessible.');
                 auth.signOut();
+            }
+        }
+        
+        // Function to fetch history via API
+        async function fetchHistory() {
+            try {
+                const historyResponse = await fetch('/api/group/history');
+                const messages = await historyResponse.json();
+
+                const chatWindow = document.getElementById("chat");
+                chatWindow.innerHTML = '';
+                
+                messages.forEach(msg => {
+                    // Alignment relies on the firebaseUid
+                    const isSelf = msg.firebaseUid === currentFirebaseUid;
+                    // NAME LOOKUP: Use the userMap to get the CURRENT name for the sender's UID
+                    const displaySender = userMap[msg.firebaseUid] || msg.username; 
+                    
+                    displayMessage(msg.text, displaySender, isSelf);
+                });
+
+            } catch (error) {
+                console.error("Error fetching chat history:", error);
             }
         }
         
@@ -240,23 +278,19 @@
         }
 
         function connectSocket() {
-            socket = io("http://localhost:5000");
+            socket = io("http://localhost:5000");
 
-            socket.on("history", (messages) => {
-                const chatWindow = document.getElementById("chat");
-                chatWindow.innerHTML = '';
-                messages.forEach(msg => {
-                    // NEW: Compare by permanent UID
-                    displayMessage(msg.text, msg.username, msg.firebaseUid === currentFirebaseUid);
-                });
-            });
+            socket.emit('identify', { firebaseUid: currentFirebaseUid });
 
-            socket.on("message", (data) => {
-                // NEW: Compare by permanent UID
-                displayMessage(data.text, data.username, data.firebaseUid === currentFirebaseUid);
-            });
-        }
+            socket.on("message", (data) => {
+                // Real-time message: Use the UID in the payload to lookup the current name
+                const isSelf = data.firebaseUid === currentFirebaseUid;
+                const displaySender = userMap[data.firebaseUid] || data.username; 
 
+                displayMessage(data.text, displaySender, isSelf);
+            });
+        }
+        
         function displayMessage(text, sender, isSelf) {
             const li = document.createElement("li");
             li.className = isSelf ? 'self-msg' : 'other-msg';
@@ -264,7 +298,6 @@
             const messageContent = document.createElement("div");
             messageContent.className = 'message-content';
             
-            // Username is included inside the message bubble for a cleaner look
             const usernameSpan = document.createElement("span");
             usernameSpan.className = 'username-msg';
             usernameSpan.innerText = `${sender}: `;
@@ -279,22 +312,25 @@
         }
 
         function send() {
-            if (!socket || !username) return;
+            if (!socket || !username) return;
 
-            const inputElement = document.getElementById("msg");
-            const text = inputElement.value.trim();
+            const inputElement = document.getElementById("msg");
+            const text = inputElement.value.trim();
 
-            if (text === "") return;
+            if (text === "") return;
 
-            const messageData = {
-                username: username,
-                text: text,
-                firebaseUid: currentFirebaseUid // <--- NEW: Send the UID
-            };
+            const messageData = {
+                username: username, // Sends the CURRENT username (for the DB record)
+                text: text,
+                firebaseUid: currentFirebaseUid // Crucial for lookup/alignment
+            };
+            
+            // OPTIONAL CLIENT-SIDE CACHE UPDATE: Ensure your local map is up-to-date instantly
+            userMap[currentFirebaseUid] = username;
 
-            socket.emit("message", messageData);
-            inputElement.value = "";
-        }
+            socket.emit("message", messageData);
+            inputElement.value = "";
+        }
     </script>
 
 </body>

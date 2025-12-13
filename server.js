@@ -8,11 +8,9 @@ const io = require("socket.io")(http, {
 });
 const mongoose = require('mongoose');
 
-// New: Middleware to parse JSON bodies for API calls
 app.use(express.json()); 
 
 // --- MongoDB Configuration ---
-// NOTE: Ensure your MONGO_URI uses the correct credentials and database name (chat_db)
 const MONGO_URI = "mongodb+srv://aswinmurugan2712_db_user:Aswin2712@aswincluster.yii7zis.mongodb.net/chat_db?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO_URI)
@@ -21,14 +19,14 @@ mongoose.connect(MONGO_URI)
 
 // --- Mongoose Schemas and Models ---
 
-// Schema for storing user details (EXPANDED FOR DATING APP PROFILE)
+// UserSchema remains updated with dating fields
 const UserSchema = new mongoose.Schema({
     firebaseUid: { type: String, required: true, unique: true }, 
     username: { type: String, required: true }, 
-    age: { type: Number }, // Used as a generic initial detail field
+    age: { type: Number }, 
     email: { type: String, required: true, unique: true },
+    details: { type: String }, 
     
-    // Updated Dating Profile Fields:
     role: { 
         type: String, 
         enum: ['Top', 'Bottom', 'Versatile', 'Versatile Top', 'Versatile Bottom', 'Power Top', 'Power Bottom', 'Prefer not to say', 'N/A'], 
@@ -40,8 +38,7 @@ const UserSchema = new mongoose.Schema({
         enum: ['Otter', 'Bear', 'Cub', 'Wolf', 'Hunk / Jock', 'Geek / Nerd', 'Gym Bro', 'Boy-next-door', 'Drag king', 'Soft masc', 'Prefer not to say', 'N/A'], 
         default: 'N/A' 
     }, 
-    about: { type: String, maxlength: 200 }, // Max length is 200 characters
-    // Placeholders for future logic
+    about: { type: String, maxlength: 200 }, 
     hasImage: { type: Boolean, default: false },
     locationEnabled: { type: Boolean, default: false }
     
@@ -49,24 +46,37 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema);
 
-// Schema for storing chat messages (Remains unchanged)
+// MessageSchema for GROUP CHAT (Includes firebaseUid for efficient name lookup)
 const MessageSchema = new mongoose.Schema({
     username: { type: String, required: true },
     text: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
-    firebaseUid: { type: String, required: true }
+    firebaseUid: { type: String, required: true } 
 });
 
 const Message = mongoose.model('Message', MessageSchema);
 
 
-// --- Express API Routes for Firebase and MongoDB ---
+// PrivateMessageSchema (Placeholder/Future Use)
+const PrivateMessageSchema = new mongoose.Schema({
+    senderUid: { type: String, required: true },
+    receiverUid: { type: String, required: true },
+    room: { type: String, required: true, index: true }, 
+    senderName: { type: String, required: true },
+    text: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now }
+});
 
-// 1. Save initial user details (Used by auth.html - UNCHANGED)
+const PrivateMessage = mongoose.model('PrivateMessage', PrivateMessageSchema);
+
+
+// --- Express API Routes ---
+
+// 1. Save initial user details
 app.post('/api/user/signup', async (req, res) => {
     const { firebaseUid, username, age, details, email } = req.body;
     try {
-        const newUser = new User({ firebaseUid, username, age, details, email });
+        const newUser = new User({ firebaseUid, username, age, details: details || '', email });
         await newUser.save();
         res.status(201).send({ message: 'User details saved successfully.' });
     } catch (error) {
@@ -75,7 +85,7 @@ app.post('/api/user/signup', async (req, res) => {
     }
 });
 
-// 2. Fetch username (Used by index.html header - UNCHANGED)
+// 2. Fetch current username
 app.get('/api/user/details/:firebaseUid', async (req, res) => {
     try {
         const user = await User.findOne({ firebaseUid: req.params.firebaseUid }).select('username');
@@ -90,10 +100,9 @@ app.get('/api/user/details/:firebaseUid', async (req, res) => {
     }
 });
 
-// 3. Fetch ALL user details (Used by profile.html - Read - UNCHANGED)
+// 3. Fetch ALL user details 
 app.get('/api/user/full-details/:firebaseUid', async (req, res) => {
     try {
-        // Fetch all fields except the Mongoose internal metadata
         const user = await User.findOne({ firebaseUid: req.params.firebaseUid }).select('-__v');
         if (user) {
             res.send(user); 
@@ -106,23 +115,14 @@ app.get('/api/user/full-details/:firebaseUid', async (req, res) => {
     }
 });
 
-// 4. Update profile details (Used by profile.html - Write)
+// 4. Update profile details 
 app.put('/api/user/profile/:firebaseUid', async (req, res) => {
-    // Now including username and age for update
     const { username, age, role, weight, type, about, locationEnabled } = req.body;
     try {
         const updatedUser = await User.findOneAndUpdate(
             { firebaseUid: req.params.firebaseUid },
-            { 
-                username: username, // Now editable
-                age: age,           // Now editable
-                role: role, 
-                weight: weight, 
-                type: type, 
-                about: about, 
-                locationEnabled: locationEnabled 
-            },
-            { new: true, runValidators: true } // Return the new document and run schema validation
+            { username, age, role, weight, type, about, locationEnabled },
+            { new: true, runValidators: true }
         );
 
         if (updatedUser) {
@@ -136,10 +136,115 @@ app.put('/api/user/profile/:firebaseUid', async (req, res) => {
     }
 });
 
-// Serve static files (auth.html, index.html, CSS, JS) from the 'public' folder
+// 5. Fetch Firebase UID by Username 
+app.get('/api/user/uid-by-name/:username', async (req, res) => {
+    try {
+        const user = await User.findOne({ username: req.params.username }).select('firebaseUid');
+        if (user) {
+            res.send({ firebaseUid: user.firebaseUid });
+        } else {
+            res.status(404).send({ message: `User ${req.params.username} not found.` });
+        }
+    } catch (error) {
+        console.error('Error fetching UID by name:', error);
+        res.status(500).send({ message: 'Server error.', error: error.message });
+    }
+});
+
+// 6. Fetch Private Message History (Placeholder)
+app.get('/api/dm/history/:room', async (req, res) => {
+    try {
+        const messages = await PrivateMessage.find({ room: req.params.room })
+            .sort({ timestamp: 1 })
+            .limit(100);
+        res.send(messages);
+    } catch (error) {
+        console.error('Error fetching DM history:', error);
+        res.status(500).send({ message: 'Error fetching DM history.', error: error.message });
+    }
+});
+
+// 7. API endpoint to fetch Group Chat History (used by index.html onload)
+app.get('/api/group/history', async (req, res) => {
+    try {
+        const messages = await Message.find().sort({ timestamp: 1 }).limit(100);
+        res.send(messages);
+    } catch (error) {
+        console.error('Error fetching group chat history:', error);
+        res.status(500).send({ message: 'Error fetching group chat history.', error: error.message });
+    }
+});
+
+// 8. NEW: API endpoint to fetch name map (low computation lookup)
+app.get('/api/users/name-map', async (req, res) => {
+    try {
+        // Only fetching the UID and current username from the small User collection
+        const users = await User.find({}).select('firebaseUid username -_id');
+        
+        // Convert the list into an easy-to-use map: { "uid1": "name1", "uid2": "name2", ... }
+        const userMap = users.reduce((map, user) => {
+            map[user.firebaseUid] = user.username;
+            return map;
+        }, {});
+        
+        res.send(userMap);
+    } catch (error) {
+        console.error('Error fetching current usernames map:', error);
+        res.status(500).send({ message: 'Error fetching current usernames.', error: error.message });
+    }
+});
+
+
+// --- Socket.io Chat Logic ---
+
+const createRoomName = (uid1, uid2) => {
+    const sortedUids = [uid1, uid2].sort();
+    return `${sortedUids[0]}_${sortedUids[1]}`;
+};
+
+io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
+
+    socket.on('identify', (data) => {
+        const { firebaseUid } = data;
+        if (firebaseUid) {
+            socket.join(firebaseUid); 
+            console.log(`User ${firebaseUid} identified and joined room.`);
+        }
+    });
+
+    // Group Chat Messaging (index.html)
+    socket.on("message", async (data) => {
+        const { username, text, firebaseUid } = data;
+        try {
+            const newMessage = new Message({
+                username,
+                text,
+                firebaseUid // Save the UID
+            });
+            await newMessage.save();
+        } catch (error) {
+            console.error('Error saving group message to MongoDB:', error);
+        }
+        
+        io.emit("message", data); 
+    });
+
+    // Private Chat Messaging (Placeholder/Future Use)
+    socket.on("privateMessage", async (data) => {
+        const { senderUid, receiverUid } = data;
+        console.log(`Received potential DM from ${senderUid} to ${receiverUid}. (Logic currently placeholder)`);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("User left:", socket.id);
+    });
+});
+
+
+// Serve static files and new routes
 app.use(express.static("public"));
 
-// Redirect root URL to the authentication page
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/auth.html'); 
 });
@@ -148,39 +253,15 @@ app.get('/profile', (req, res) => {
     res.sendFile(__dirname + '/public/profile.html');
 });
 
-
-// --- Socket.io Chat Logic (Unchanged) ---
-io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
-
-    // Fetch and emit message history upon connection
-    Message.find().sort({ timestamp: 1 }).limit(100).then(messages => {
-        socket.emit('history', messages); // Emit 'history' event to the connecting user
-    }).catch(err => console.error("Error fetching history:", err));
-
-    // Data is an object: { username: "...", text: "..." }
-    socket.on("message", async (data) => {
-        // 1. Save the new message to MongoDB Atlas
-        try {
-            const newMessage = new Message({
-                username: data.username,
-                text: data.text,
-                firebaseUid: data.firebaseUid
-            });
-            await newMessage.save();
-        } catch (error) {
-            console.error('Error saving message to MongoDB:', error);
-        }
-        
-        // 2. Broadcast the message object to everyone (including the sender, for consistency)
-        io.emit("message", data);
-    });
-
-    socket.on("disconnect", () => {
-        console.log("User left:", socket.id);
-    });
+// New routes for placeholder pages
+app.get('/one_one_chat.html', (req, res) => {
+    res.sendFile(__dirname + '/public/one_one_chat.html');
 });
 
-http.listen(5000,"0.0.0.0", () => {
+app.get('/one_one_vc.html', (req, res) => {
+    res.sendFile(__dirname + '/public/one_one_vc.html');
+});
+
+http.listen(5000, "0.0.0.0", () => {
     console.log("Server running on http://localhost:5000");
 });
