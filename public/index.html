@@ -98,30 +98,38 @@
         
         #chat { 
             list-style: none; 
-            padding: 20px; 
+            padding: 12px 8px; /* smaller horizontal padding so bubbles can reach edges */
             flex-grow: 1; 
             overflow-y: auto; 
             background: #f9f9f9; 
             margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
         #chat li { 
-            padding: 8px 0; 
+            padding: 0; 
             word-wrap: break-word; 
             display: flex;
             align-items: flex-start;
+            width: 100%; /* make each message row span full width */
+            box-sizing: border-box;
         }
         .message-content {
-            padding: 8px 12px;
+            padding: 10px 14px;
             border-radius: 18px;
-            max-width: 70%;
-            display: inline-block;
+            max-width: 78%;
+            display: block;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             line-height: 1.4;
+            word-break: break-word;
+            margin: 6px 0; /* vertical spacing */
         }
+        /* Align bubbles to edges: self -> right, other -> left */
         .self-msg { justify-content: flex-end; }
-        .self-msg .message-content { background-color: #DCF8C6; color: #111; }
+        .self-msg .message-content { background-color: #DCF8C6; color: #111; margin-left: auto; margin-right: 8px; }
         .other-msg { justify-content: flex-start; }
-        .other-msg .message-content { background-color: #E2E2E2; color: #111; }
+        .other-msg .message-content { background-color: #E2E2E2; color: #111; margin-right: auto; margin-left: 8px; }
         .username-msg { font-weight: bold; margin-right: 8px; color: #007bff; }
         .self-msg .username-msg { color: #28a745; }
         .clickable-username {
@@ -178,6 +186,7 @@
             <a href="index.html" class="active">Group Chat</a>
             <a href="one_one_chat.html">1-1 Chat</a>
             <a href="one_one_vc.html">1-1 VC</a>
+            <a href="donate.html">Donate & Support</a>
         </div>
         <!-- END NEW: Navigation Bar -->
         
