@@ -63,25 +63,54 @@
 
     <!-- Read-only User Details Modal (larger, richer layout) -->
     <div id="user-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:9999;">
-        <div style="background:#fff; width:460px; max-width:96%; margin:auto; border-radius:10px; box-shadow:0 16px 48px rgba(0,0,0,0.35); overflow:hidden;">
+        <div style="background:#fff; width:650px; max-width:96%; margin:auto; border-radius:12px; box-shadow:0 16px 48px rgba(0,0,0,0.35); overflow:hidden;">
             <div style="padding:14px 18px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background: linear-gradient(90deg,#f7fbff,#ffffff);">
                 <strong style="font-size:16px;">User Details</strong>
                 <button id="close-user-modal" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:#666;">✕</button>
             </div>
-            <div id="user-details-content" style="padding:18px; display:flex; gap:16px; align-items:flex-start;">
-                <div style="width:96px; height:96px; border-radius:12px; background:#f0f0f0; display:flex; align-items:center; justify-content:center; font-weight:700; color:#666;">IMG</div>
-                <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:110px; color:#444;"><strong>Name</strong></div><div id="ud-name" style="color:#222"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:110px; color:#444;"><strong>Username</strong></div><div id="ud-username" style="color:#222"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:110px; color:#444;"><strong>Age</strong></div><div id="ud-age" style="color:#222"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:110px; color:#444;"><strong>Weight</strong></div><div id="ud-weight" style="color:#222"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:110px; color:#444;"><strong>Role</strong></div><div id="ud-role" style="color:#222"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:110px; color:#444;"><strong>Type</strong></div><div id="ud-type" style="color:#222"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:110px; color:#444;"><strong>Phone</strong></div><div id="ud-phone" style="color:#222"></div></div>
-                    <div style="display:flex; gap:12px; align-items:flex-start;"><div style="min-width:110px; color:#444;"><strong>About</strong></div><div id="ud-about" style="color:#222; max-width:260px;"></div></div>
+            <div id="user-details-content" style="padding:22px; display:flex; gap:20px; align-items:flex-start;">
+                <!-- Left side: Image + Click to View text -->
+                <div style="display:flex; flex-direction:column; gap:12px; align-items:center;">
+                    <!-- Image section: larger, clickable, with green border -->
+                    <div id="user-image-box" style="width:180px; height:180px; border-radius:14px; background:linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%); display:flex; align-items:center; justify-content:center; font-weight:700; color:#999; cursor:pointer; position:relative; overflow:hidden; flex-shrink:0; border:3px solid #28a745;">IMG</div>
+                    
+                    <!-- Text hint only -->
+                    <div style="font-weight:600; color:#28a745; font-size:12px;">Click to View</div>
+                </div>
+                
+                <!-- Right side: User info -->
+                <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Username</strong></div><div id="ud-username" style="color:#222; font-weight:500;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Age</strong></div><div id="ud-age" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Weight</strong></div><div id="ud-weight" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Role</strong></div><div id="ud-role" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Type</strong></div><div id="ud-type" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:flex-start;"><div style="min-width:100px; color:#444;"><strong>About</strong></div><div id="ud-about" style="color:#222; max-width:280px;"></div></div>
                 </div>
             </div>
-            <div style="padding:12px 18px; border-top:1px solid #eee; text-align:right; background:#fbfbfe;"><button id="close-user-modal-2" style="padding:8px 14px; border-radius:6px; background:#0b5ed7; color:#fff; border:none; cursor:pointer;">Close</button></div>
+            <div style="padding:14px 18px; border-top:1px solid #eee; text-align:right; background:#fbfbfe;"><button id="close-user-modal-2" style="padding:8px 16px; border-radius:6px; background:#0b5ed7; color:#fff; border:none; cursor:pointer; font-weight:500;">Close</button></div>
+        </div>
+    </div>
+
+    <!-- Image Gallery Lightbox with Swipe -->
+    <div id="image-lightbox" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center;">
+        <div style="position:relative; width:90%; max-width:600px; display:flex; align-items:center; justify-content:center;">
+            <!-- Close Button -->
+            <button id="lightbox-close" style="position:absolute; top:-35px; right:0; background:transparent; border:none; font-size:28px; cursor:pointer; color:#fff;">✕</button>
+            
+            <!-- Image Container -->
+            <div id="lightbox-container" style="position:relative; width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:8px;">
+                <img id="lightbox-image" src="" alt="gallery" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
+            </div>
+            
+            <!-- Previous Button -->
+            <button id="lightbox-prev" style="position:absolute; left:-50px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.2); border:none; font-size:32px; cursor:pointer; color:#fff; padding:10px 15px; border-radius:8px; transition:background 0.2s;">❮</button>
+            
+            <!-- Next Button -->
+            <button id="lightbox-next" style="position:absolute; right:-50px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.2); border:none; font-size:32px; cursor:pointer; color:#fff; padding:10px 15px; border-radius:8px; transition:background 0.2s;">❯</button>
+            
+            <!-- Image Counter -->
+            <div id="lightbox-counter" style="position:absolute; bottom:15px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.5); color:#fff; padding:6px 12px; border-radius:20px; font-size:12px;">1/1</div>
         </div>
     </div>
 
@@ -250,6 +279,10 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
+        // Global variable to track gallery state
+        let currentGalleryImages = [];
+        let currentGalleryIndex = 0;
+
         // Show a read-only modal with user details fetched from server
         async function showUserDetails(uid) {
             try {
@@ -262,15 +295,19 @@
                 document.getElementById('ud-weight').innerText = data.weight !== undefined ? data.weight : '-';
                 document.getElementById('ud-role').innerText = data.role || '-';
                 document.getElementById('ud-type').innerText = data.type || '-';
-                document.getElementById('ud-phone').innerText = data.phone || '-';
                 document.getElementById('ud-about').innerText = data.about || '-';
 
-                // If there is an avatar or image URL, replace the IMG placeholder
-                if (data.avatarUrl) {
-                    const imgBox = document.querySelector('#user-details-content > div');
-                    if (imgBox) {
-                        imgBox.innerHTML = `<img src="${data.avatarUrl}" alt="avatar" style="width:96px;height:96px;border-radius:10px;object-fit:cover;">`;
-                    }
+                // Handle avatar/images
+                const imgBox = document.getElementById('user-image-box');
+                currentGalleryImages = data.photoUrls && data.photoUrls.length > 0 ? data.photoUrls : [];
+                currentGalleryIndex = 0;
+
+                if (currentGalleryImages.length > 0) {
+                    imgBox.innerHTML = `<img src="${currentGalleryImages[0]}" alt="profile" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+                    imgBox.onclick = openImageLightbox;
+                } else {
+                    imgBox.innerHTML = 'IMG';
+                    imgBox.onclick = null;
                 }
 
                 const modal = document.getElementById('user-modal');
@@ -287,6 +324,29 @@
             }
         }
 
+        function openImageLightbox() {
+            if (currentGalleryImages.length === 0) return;
+            const lightbox = document.getElementById('image-lightbox');
+            const img = document.getElementById('lightbox-image');
+            const counter = document.getElementById('lightbox-counter');
+            
+            currentGalleryIndex = 0;
+            img.src = currentGalleryImages[0];
+            counter.innerText = `1/${currentGalleryImages.length}`;
+            lightbox.style.display = 'flex';
+        }
+
+        function updateLightboxImage() {
+            const img = document.getElementById('lightbox-image');
+            const counter = document.getElementById('lightbox-counter');
+            img.src = currentGalleryImages[currentGalleryIndex];
+            counter.innerText = `${currentGalleryIndex + 1}/${currentGalleryImages.length}`;
+        }
+
+        function closeLightbox() {
+            document.getElementById('image-lightbox').style.display = 'none';
+        }
+
         function closeUserModal() {
             const modal = document.getElementById('user-modal');
             if (modal) modal.style.display = 'none';
@@ -294,6 +354,73 @@
 
         document.getElementById('dm-send').onclick = sendDM;
         document.getElementById('dm-msg').onkeypress = function(e) { if (e.key === 'Enter') sendDM(); };
+
+        // Lightbox controls
+        document.getElementById('lightbox-close').onclick = closeLightbox;
+        document.getElementById('lightbox-prev').onclick = function() {
+            if (currentGalleryImages.length === 0) return;
+            currentGalleryIndex = (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+            updateLightboxImage();
+        };
+        document.getElementById('lightbox-next').onclick = function() {
+            if (currentGalleryImages.length === 0) return;
+            currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+            updateLightboxImage();
+        };
+
+        // Close lightbox when clicking outside
+        document.getElementById('image-lightbox').onclick = function(e) {
+            if (e.target === document.getElementById('image-lightbox')) {
+                closeLightbox();
+            }
+        };
+
+        // Swipe functionality for lightbox
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const lightboxContainer = document.getElementById('lightbox-container');
+        
+        lightboxContainer.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, false);
+
+        lightboxContainer.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, false);
+
+        function handleSwipe() {
+            if (currentGalleryImages.length === 0) return;
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    // Swiped left, show next image
+                    currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+                } else {
+                    // Swiped right, show previous image
+                    currentGalleryIndex = (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+                }
+                updateLightboxImage();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            const lightbox = document.getElementById('image-lightbox');
+            if (lightbox.style.display !== 'flex') return;
+            
+            if (e.key === 'ArrowLeft') {
+                currentGalleryIndex = (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+                updateLightboxImage();
+            } else if (e.key === 'ArrowRight') {
+                currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+                updateLightboxImage();
+            } else if (e.key === 'Escape') {
+                closeLightbox();
+            }
+        });
 
         function sendDM() {
             const input = document.getElementById('dm-msg');
