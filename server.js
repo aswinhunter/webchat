@@ -54,6 +54,9 @@ const MessageSchema = new mongoose.Schema({
     firebaseUid: { type: String, required: true } 
 });
 
+// TTL index: expire group chat messages after 1 day (86400 seconds)
+MessageSchema.index({ timestamp: 1 }, { expireAfterSeconds: 86400 });
+
 const Message = mongoose.model('Message', MessageSchema);
 
 
@@ -66,6 +69,9 @@ const PrivateMessageSchema = new mongoose.Schema({
     text: { type: String, required: true },
     timestamp: { type: Date, default: Date.now }
 });
+
+// TTL index: expire one-to-one (DM) messages after 7 days (604800 seconds)
+PrivateMessageSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 });
 
 const PrivateMessage = mongoose.model('PrivateMessage', PrivateMessageSchema);
 
