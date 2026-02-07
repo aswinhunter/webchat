@@ -40,16 +40,77 @@
     </div>
     
     <!-- Chat UI (replaces placeholder) -->
-    <div class="container" id="dm-container" style="display:none;">
-        <div style="padding: 15px; width: 100%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee;">
-            <a href="index.html">Back</a>
-            <div id="dm-user">Chat</div>
+    <div class="container" id="dm-container" style="display:none; align-items:stretch;">
+        <div style="padding: 12px 16px; width: 100%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee;">
+            <!-- Back + Username grouped in a pill with divider -->
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div id="back-username-box" style="display:flex; align-items:center; gap:12px; background: #f5f8fd; border:1px solid #e1e8ff; padding:6px 10px; border-radius:8px; box-shadow:0 1px 0 rgba(0,0,0,0.03);">
+                    <a href="one_one_chat.html" style="color:#007bff; font-weight:700; text-decoration:none;">Back</a>
+                    <div style="width:1px; height:20px; background:#d7dbe8; border-radius:1px;"></div>
+                    <!-- Username placed to the right of Back; clickable to open readonly profile -->
+                    <a id="dm-username" href="javascript:void(0)" style="font-weight:700; color:#0b5ed7; text-decoration:none; cursor:pointer;">User</a>
+                </div>
+            </div>
+            <div style="flex:1; text-align:center; visibility:hidden;">&nbsp;</div>
             <div></div>
         </div>
-        <ul id="dm-chat" style="list-style:none; padding:15px; flex-grow:1; overflow:auto; margin:0; height:60vh; background:#f8f8f8;"></ul>
+        <ul id="dm-chat" style="list-style:none; padding:15px 8px; flex-grow:1; overflow:auto; margin:0; height:60vh; background:#f8f8f8; width:100%; box-sizing:border-box;"></ul>
         <div style="display:flex; padding:10px; gap:8px; background:#f0f0f0;">
             <input id="dm-msg" placeholder="Type a message" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ccc;"/>
             <button id="dm-send" style="padding:10px 15px; border-radius:8px; background:#007bff; color:white; border:none;">Send</button>
+        </div>
+    </div>
+
+    <!-- Read-only User Details Modal (larger, richer layout) -->
+    <div id="user-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:9999;">
+        <div style="background:#fff; width:650px; max-width:96%; margin:auto; border-radius:12px; box-shadow:0 16px 48px rgba(0,0,0,0.35); overflow:hidden;">
+            <div style="padding:14px 18px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background: linear-gradient(90deg,#f7fbff,#ffffff);">
+                <strong style="font-size:16px;">User Details</strong>
+                <button id="close-user-modal" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:#666;">✕</button>
+            </div>
+            <div id="user-details-content" style="padding:22px; display:flex; gap:20px; align-items:flex-start;">
+                <!-- Left side: Image + Click to View text -->
+                <div style="display:flex; flex-direction:column; gap:12px; align-items:center;">
+                    <!-- Image section: larger, clickable, with green border -->
+                    <div id="user-image-box" style="width:180px; height:180px; border-radius:14px; background:linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%); display:flex; align-items:center; justify-content:center; font-weight:700; color:#999; cursor:pointer; position:relative; overflow:hidden; flex-shrink:0; border:3px solid #28a745;">IMG</div>
+                    
+                    <!-- Text hint only -->
+                    <div style="font-weight:600; color:#28a745; font-size:12px;">Click to View</div>
+                </div>
+                
+                <!-- Right side: User info -->
+                <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Username</strong></div><div id="ud-username" style="color:#222; font-weight:500;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Age</strong></div><div id="ud-age" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Weight</strong></div><div id="ud-weight" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Role</strong></div><div id="ud-role" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Type</strong></div><div id="ud-type" style="color:#222;"></div></div>
+                    <div style="display:flex; gap:12px; align-items:flex-start;"><div style="min-width:100px; color:#444;"><strong>About</strong></div><div id="ud-about" style="color:#222; max-width:280px;"></div></div>
+                </div>
+            </div>
+            <div style="padding:14px 18px; border-top:1px solid #eee; text-align:right; background:#fbfbfe;"><button id="close-user-modal-2" style="padding:8px 16px; border-radius:6px; background:#0b5ed7; color:#fff; border:none; cursor:pointer; font-weight:500;">Close</button></div>
+        </div>
+    </div>
+
+    <!-- Image Gallery Lightbox with Swipe -->
+    <div id="image-lightbox" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center;">
+        <div style="position:relative; width:90%; max-width:600px; display:flex; align-items:center; justify-content:center;">
+            <!-- Close Button -->
+            <button id="lightbox-close" style="position:absolute; top:-35px; right:0; background:transparent; border:none; font-size:28px; cursor:pointer; color:#fff;">✕</button>
+            
+            <!-- Image Container -->
+            <div id="lightbox-container" style="position:relative; width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:8px;">
+                <img id="lightbox-image" src="" alt="gallery" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
+            </div>
+            
+            <!-- Previous Button -->
+            <button id="lightbox-prev" style="position:absolute; left:-50px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.2); border:none; font-size:32px; cursor:pointer; color:#fff; padding:10px 15px; border-radius:8px; transition:background 0.2s;">❮</button>
+            
+            <!-- Next Button -->
+            <button id="lightbox-next" style="position:absolute; right:-50px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.2); border:none; font-size:32px; cursor:pointer; color:#fff; padding:10px 15px; border-radius:8px; transition:background 0.2s;">❯</button>
+            
+            <!-- Image Counter -->
+            <div id="lightbox-counter" style="position:absolute; bottom:15px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.5); color:#fff; padding:6px 12px; border-radius:20px; font-size:12px;">1/1</div>
         </div>
     </div>
 
@@ -138,8 +199,12 @@
                 // fetch other user's display name
                 const othersResp = await fetch(`/api/user/full-details/${otherUid}`);
                 const otherData = await othersResp.json();
-                const displayName = otherData.username || 'Unknown';
-                document.getElementById('dm-user').innerText = displayName;
+                const displayName = otherData.username || otherData.name || 'Unknown';
+                const dmUsernameEl = document.getElementById('dm-username');
+                if (dmUsernameEl) {
+                    dmUsernameEl.innerText = displayName;
+                    dmUsernameEl.onclick = function() { showUserDetails(otherUid); };
+                }
 
                 // compute the room
                 room = createRoomName(currentFirebaseUid, otherUid);
@@ -180,6 +245,8 @@
             li.style.display = 'flex';
             li.style.justifyContent = isSelf ? 'flex-end' : 'flex-start';
             li.style.padding = '6px 0';
+            li.style.width = '100%';
+            li.style.boxSizing = 'border-box';
             const bubble = document.createElement('div');
             bubble.style.maxWidth = '70%';
             bubble.style.padding = '8px 12px';
@@ -187,6 +254,9 @@
             bubble.style.background = isSelf ? '#DCF8C6' : '#E2E2E2';
             bubble.style.color = '#111';
             bubble.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+            /* Align bubble to the correct side by using auto margins */
+            bubble.style.marginLeft = isSelf ? 'auto' : '0';
+            bubble.style.marginRight = isSelf ? '0' : 'auto';
             if (!isSelf) {
                 const name = document.createElement('div');
                 name.style.fontWeight = '700';
@@ -209,8 +279,148 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
+        // Global variable to track gallery state
+        let currentGalleryImages = [];
+        let currentGalleryIndex = 0;
+
+        // Show a read-only modal with user details fetched from server
+        async function showUserDetails(uid) {
+            try {
+                const res = await fetch(`/api/user/full-details/${encodeURIComponent(uid)}`);
+                if (!res.ok) throw new Error('Failed to fetch user details');
+                const data = await res.json();
+
+                document.getElementById('ud-username').innerText = data.username || '-';
+                document.getElementById('ud-age').innerText = data.age !== undefined ? data.age : '-';
+                document.getElementById('ud-weight').innerText = data.weight !== undefined ? data.weight : '-';
+                document.getElementById('ud-role').innerText = data.role || '-';
+                document.getElementById('ud-type').innerText = data.type || '-';
+                document.getElementById('ud-about').innerText = data.about || '-';
+
+                // Handle avatar/images
+                const imgBox = document.getElementById('user-image-box');
+                currentGalleryImages = data.photoUrls && data.photoUrls.length > 0 ? data.photoUrls : [];
+                currentGalleryIndex = 0;
+
+                if (currentGalleryImages.length > 0) {
+                    imgBox.innerHTML = `<img src="${currentGalleryImages[0]}" alt="profile" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+                    imgBox.onclick = openImageLightbox;
+                } else {
+                    imgBox.innerHTML = 'IMG';
+                    imgBox.onclick = null;
+                }
+
+                const modal = document.getElementById('user-modal');
+                modal.style.display = 'flex';
+
+                // wire close buttons
+                document.getElementById('close-user-modal').onclick = closeUserModal;
+                document.getElementById('close-user-modal-2').onclick = closeUserModal;
+                // clicking outside content closes the modal
+                modal.onclick = function(e) { if (e.target === modal) closeUserModal(); };
+            } catch (err) {
+                console.error('Error loading user details', err);
+                alert('Could not load user details.');
+            }
+        }
+
+        function openImageLightbox() {
+            if (currentGalleryImages.length === 0) return;
+            const lightbox = document.getElementById('image-lightbox');
+            const img = document.getElementById('lightbox-image');
+            const counter = document.getElementById('lightbox-counter');
+            
+            currentGalleryIndex = 0;
+            img.src = currentGalleryImages[0];
+            counter.innerText = `1/${currentGalleryImages.length}`;
+            lightbox.style.display = 'flex';
+        }
+
+        function updateLightboxImage() {
+            const img = document.getElementById('lightbox-image');
+            const counter = document.getElementById('lightbox-counter');
+            img.src = currentGalleryImages[currentGalleryIndex];
+            counter.innerText = `${currentGalleryIndex + 1}/${currentGalleryImages.length}`;
+        }
+
+        function closeLightbox() {
+            document.getElementById('image-lightbox').style.display = 'none';
+        }
+
+        function closeUserModal() {
+            const modal = document.getElementById('user-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
         document.getElementById('dm-send').onclick = sendDM;
         document.getElementById('dm-msg').onkeypress = function(e) { if (e.key === 'Enter') sendDM(); };
+
+        // Lightbox controls
+        document.getElementById('lightbox-close').onclick = closeLightbox;
+        document.getElementById('lightbox-prev').onclick = function() {
+            if (currentGalleryImages.length === 0) return;
+            currentGalleryIndex = (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+            updateLightboxImage();
+        };
+        document.getElementById('lightbox-next').onclick = function() {
+            if (currentGalleryImages.length === 0) return;
+            currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+            updateLightboxImage();
+        };
+
+        // Close lightbox when clicking outside
+        document.getElementById('image-lightbox').onclick = function(e) {
+            if (e.target === document.getElementById('image-lightbox')) {
+                closeLightbox();
+            }
+        };
+
+        // Swipe functionality for lightbox
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const lightboxContainer = document.getElementById('lightbox-container');
+        
+        lightboxContainer.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, false);
+
+        lightboxContainer.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, false);
+
+        function handleSwipe() {
+            if (currentGalleryImages.length === 0) return;
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    // Swiped left, show next image
+                    currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+                } else {
+                    // Swiped right, show previous image
+                    currentGalleryIndex = (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+                }
+                updateLightboxImage();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            const lightbox = document.getElementById('image-lightbox');
+            if (lightbox.style.display !== 'flex') return;
+            
+            if (e.key === 'ArrowLeft') {
+                currentGalleryIndex = (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+                updateLightboxImage();
+            } else if (e.key === 'ArrowRight') {
+                currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
+                updateLightboxImage();
+            } else if (e.key === 'Escape') {
+                closeLightbox();
+            }
+        });
 
         function sendDM() {
             const input = document.getElementById('dm-msg');

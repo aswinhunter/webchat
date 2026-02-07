@@ -7,8 +7,14 @@ const io = require("socket.io")(http, {
     }
 });
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 app.use(express.json()); 
+
+// --- Cloudinary Configuration ---
+const CLOUDINARY_CLOUD_NAME = 'dbuvfb1ye';
+const CLOUDINARY_API_KEY = '811241234641619';
+const CLOUDINARY_API_SECRET = 'Nlsm9cOW5ObSCudLvucVEBbeTbE';
 
 // --- MongoDB Configuration ---
 const MONGO_URI = "mongodb+srv://aswinmurugan2712_db_user:Aswin2712@aswincluster.yii7zis.mongodb.net/chat_db?retryWrites=true&w=majority";
@@ -39,8 +45,7 @@ const UserSchema = new mongoose.Schema({
         default: 'N/A' 
     }, 
     about: { type: String, maxlength: 200 }, 
-    hasImage: { type: Boolean, default: false },
-    locationEnabled: { type: Boolean, default: false }
+    photoUrls: { type: [String], default: [] } // Cloudinary image URLs
     
 }, { timestamps: true });
 
@@ -54,6 +59,9 @@ const MessageSchema = new mongoose.Schema({
     firebaseUid: { type: String, required: true } 
 });
 
+// TTL index: expire group chat messages after 1 day (86400 seconds)
+MessageSchema.index({ timestamp: 1 }, { expireAfterSeconds: 86400 });
+
 const Message = mongoose.model('Message', MessageSchema);
 
 
@@ -66,6 +74,9 @@ const PrivateMessageSchema = new mongoose.Schema({
     text: { type: String, required: true },
     timestamp: { type: Date, default: Date.now }
 });
+
+// TTL index: expire one-to-one (DM) messages after 7 days (604800 seconds)
+PrivateMessageSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 });
 
 const PrivateMessage = mongoose.model('PrivateMessage', PrivateMessageSchema);
 
@@ -117,11 +128,11 @@ app.get('/api/user/full-details/:firebaseUid', async (req, res) => {
 
 // 4. Update profile details 
 app.put('/api/user/profile/:firebaseUid', async (req, res) => {
-    const { username, age, role, weight, type, about, locationEnabled } = req.body;
+    const { username, age, role, weight, type, about } = req.body;
     try {
         const updatedUser = await User.findOneAndUpdate(
             { firebaseUid: req.params.firebaseUid },
-            { username, age, role, weight, type, about, locationEnabled },
+            { username, age, role, weight, type, about },
             { new: true, runValidators: true }
         );
 
@@ -133,6 +144,85 @@ app.put('/api/user/profile/:firebaseUid', async (req, res) => {
     } catch (error) {
         console.error('Error updating profile:', error);
         res.status(500).send({ message: 'Error updating profile.', error: error.message });
+    }
+});
+
+// 4.5 Update user photo URLs (from Cloudinary)
+app.put('/api/user/photos/:firebaseUid', async (req, res) => {
+    const { photoUrls } = req.body;
+    try {
+        if (!Array.isArray(photoUrls) || photoUrls.length > 4) {
+            return res.status(400).send({ message: 'photoUrls must be an array with max 4 items.' });
+        }
+
+        const updatedUser = await User.findOneAndUpdate(
+            { firebaseUid: req.params.firebaseUid },
+            { photoUrls },
+            { new: true, runValidators: true }
+        );
+
+        if (updatedUser) {
+            res.send({ message: 'Photos updated successfully!', photoUrls: updatedUser.photoUrls });
+        } else {
+            res.status(404).send({ message: 'User not found.' });
+        }
+    } catch (error) {
+        console.error('Error updating photos:', error);
+        res.status(500).send({ message: 'Error updating photos.', error: error.message });
+    }
+});
+
+// 4.6 Delete photo from Cloudinary and MongoDB
+app.delete('/api/user/photos/:firebaseUid/:index', async (req, res) => {
+    const { firebaseUid, index } = req.params;
+    
+    try {
+        // Get user document
+        const user = await User.findOne({ firebaseUid });
+        if (!user) {
+            return res.status(404).send({ message: 'User not found.' });
+        }
+
+        const photoUrl = user.photoUrls[index];
+        if (!photoUrl) {
+            return res.status(404).send({ message: 'Photo not found.' });
+        }
+
+        // Extract public_id from Cloudinary URL
+        // URL format: https://res.cloudinary.com/{cloud}/image/upload/{version}/{public_id}
+        const urlParts = photoUrl.split('/');
+        const publicIdWithExt = urlParts[urlParts.length - 1];
+        const publicId = urlParts.slice(7).join('/').split('.')[0]; // Extract everything after /upload/v... and remove extension
+
+        // Delete from Cloudinary using Admin API
+        const timestamp = Math.floor(Date.now() / 1000);
+        const authString = `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
+        const signature = crypto.createHash('sha1').update(authString).digest('hex');
+
+        const cloudinaryDeleteUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`;
+        const formData = new URLSearchParams();
+        formData.append('public_id', publicId);
+        formData.append('signature', signature);
+        formData.append('api_key', CLOUDINARY_API_KEY);
+        formData.append('timestamp', timestamp);
+
+        const cloudinaryResponse = await fetch(cloudinaryDeleteUrl, {
+            method: 'POST',
+            body: formData
+        });
+
+        const cloudinaryData = await cloudinaryResponse.json();
+        console.log('Cloudinary delete response:', cloudinaryData);
+
+        // Remove from MongoDB
+        user.photoUrls[index] = null;
+        user.photoUrls = user.photoUrls.filter(url => url !== null);
+        await user.save();
+
+        res.send({ message: 'Photo deleted from Cloudinary and MongoDB!', photoUrls: user.photoUrls });
+    } catch (error) {
+        console.error('Error deleting photo:', error);
+        res.status(500).send({ message: 'Error deleting photo.', error: error.message });
     }
 });
 
