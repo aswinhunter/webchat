@@ -8,8 +8,18 @@ const io = require("socket.io")(http, {
 });
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
 
 app.use(express.json()); 
+
+// --- Multer Configuration for File Uploads ---
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 // --- Cloudinary Configuration ---
 const CLOUDINARY_CLOUD_NAME = 'dbuvfb1ye';
@@ -71,7 +81,8 @@ const PrivateMessageSchema = new mongoose.Schema({
     receiverUid: { type: String, required: true },
     room: { type: String, required: true, index: true }, 
     senderName: { type: String, required: true },
-    text: { type: String, required: true },
+    text: { type: String, default: '' },
+    imageUrl: { type: String, default: null }, // Cloudinary URL for image
     timestamp: { type: Date, default: Date.now }
 });
 
@@ -226,6 +237,93 @@ app.delete('/api/user/photos/:firebaseUid/:index', async (req, res) => {
     }
 });
 
+// 4.6 DELETE photo from Cloudinary and MongoDB
+app.delete('/api/user/photos/:firebaseUid/:index', async (req, res) => {
+    const { firebaseUid, index } = req.params;
+    
+    try {
+        // Get user document
+        const user = await User.findOne({ firebaseUid });
+        if (!user) {
+            return res.status(404).send({ message: 'User not found.' });
+        }
+
+        const photoUrl = user.photoUrls[index];
+        if (!photoUrl) {
+            return res.status(404).send({ message: 'Photo not found.' });
+        }
+
+        // Extract public_id from Cloudinary URL
+        // URL format: https://res.cloudinary.com/{cloud}/image/upload/{version}/{public_id}
+        const urlParts = photoUrl.split('/');
+        const publicIdWithExt = urlParts[urlParts.length - 1];
+        const publicId = urlParts.slice(7).join('/').split('.')[0]; // Extract everything after /upload/v... and remove extension
+
+        // Delete from Cloudinary using Admin API
+        const timestamp = Math.floor(Date.now() / 1000);
+        const authString = `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
+        const signature = crypto.createHash('sha1').update(authString).digest('hex');
+
+        const cloudinaryDeleteUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`;
+        const formData = new URLSearchParams();
+        formData.append('public_id', publicId);
+        formData.append('signature', signature);
+        formData.append('api_key', CLOUDINARY_API_KEY);
+        formData.append('timestamp', timestamp);
+
+        const cloudinaryResponse = await fetch(cloudinaryDeleteUrl, {
+            method: 'POST',
+            body: formData
+        });
+
+        const cloudinaryData = await cloudinaryResponse.json();
+        console.log('Cloudinary delete response:', cloudinaryData);
+
+        // Remove from MongoDB
+        user.photoUrls[index] = null;
+        user.photoUrls = user.photoUrls.filter(url => url !== null);
+        await user.save();
+
+        res.send({ message: 'Photo deleted from Cloudinary and MongoDB!', photoUrls: user.photoUrls });
+    } catch (error) {
+        console.error('Error deleting photo:', error);
+        res.status(500).send({ message: 'Error deleting photo.', error: error.message });
+    }
+});
+
+// 4.7 Upload Photo to Cloudinary (for chat messages)
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).send({ message: 'No file provided.' });
+        }
+
+        // Create FormData for Cloudinary upload
+        const formData = new FormData();
+        formData.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
+        formData.append('upload_preset', 'chat_media'); // Make sure this preset exists in Cloudinary
+        formData.append('cloud_name', CLOUDINARY_CLOUD_NAME);
+
+        // Upload to Cloudinary
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+        
+        const response = await axios.post(uploadUrl, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+
+        if (response.data && response.data.secure_url) {
+            res.send({ url: response.data.secure_url });
+        } else {
+            res.status(500).send({ message: 'Failed to upload to Cloudinary.' });
+        }
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        res.status(500).send({ message: 'Error uploading file.', error: error.message });
+    }
+});
+
 // 5. Fetch Firebase UID by Username 
 app.get('/api/user/uid-by-name/:username', async (req, res) => {
     try {
@@ -331,7 +429,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("privateMessage", async (data) => {
-        const { senderUid, receiverUid, room, senderName, text } = data;
+        const { senderUid, receiverUid, room, senderName, text, imageUrl } = data;
 
         // Basic server-side verification: ensure the socket's firebaseUid matches the senderUid.
         if (!socket.firebaseUid || socket.firebaseUid !== senderUid) {
@@ -345,7 +443,8 @@ io.on("connection", (socket) => {
                 receiverUid,
                 room,
                 senderName,
-                text
+                text: text || '',
+                imageUrl: imageUrl || null
             });
             await newPrivate.save();
 
@@ -355,7 +454,8 @@ io.on("connection", (socket) => {
                 receiverUid,
                 room,
                 senderName,
-                text,
+                text: text || '',
+                imageUrl: imageUrl || null,
                 timestamp: newPrivate.timestamp
             });
         } catch (error) {
@@ -393,7 +493,58 @@ http.listen(5000, "0.0.0.0", () => {
     console.log("Server running on http://localhost:5000");
 });
 
-// 6b. Fetch DM peers for a user: return peers who sent/received messages with the given UID
+// 9. DELETE a DM message (for auto-delete after viewing)
+app.post('/api/dm/delete-message', async (req, res) => {
+    try {
+        const { messageId, room, imageUrl } = req.body;
+        
+        if (!messageId || !room) {
+            return res.status(400).send({ message: 'messageId and room are required.' });
+        }
+
+        // Delete from MongoDB
+        await PrivateMessage.deleteOne({ _id: messageId, room });
+        
+        // Delete from Cloudinary if imageUrl exists
+        if (imageUrl) {
+            try {
+                // Extract public_id from Cloudinary URL
+                // URL format: https://res.cloudinary.com/dbuvfb1ye/image/upload/v1234567890/chat_media/filename.jpg
+                // We need to extract: chat_media/filename (without extension)
+                const urlParts = imageUrl.split('/upload/');
+                if (urlParts.length > 1) {
+                    const pathParts = urlParts[1].split('/');
+                    // Remove version (v1234567890) if present
+                    let public_id = pathParts.slice(pathParts[0].startsWith('v') ? 1 : 0).join('/');
+                    // Remove file extension
+                    public_id = public_id.substring(0, public_id.lastIndexOf('.'));
+                    
+                    // Delete from Cloudinary using API
+                    const deleteUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`;
+                    await axios.post(deleteUrl, {
+                        public_id: public_id
+                    }, {
+                        auth: {
+                            username: CLOUDINARY_API_KEY,
+                            password: CLOUDINARY_API_SECRET
+                        }
+                    });
+                    console.log(`Deleted Cloudinary image: ${public_id}`);
+                }
+            } catch (cloudinaryError) {
+                console.error('Error deleting from Cloudinary:', cloudinaryError.message);
+                // Don't fail the request if Cloudinary delete fails
+            }
+        }
+        
+        res.send({ message: 'Message deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting message:', error);
+        res.status(500).send({ message: 'Error deleting message.', error: error.message });
+    }
+});
+
+// 10. Fetch DM peers for a user: return peers who sent/received messages with the given UID
 app.get('/api/dm/peers/:firebaseUid', async (req, res) => {
     try {
         const uid = req.params.firebaseUid;

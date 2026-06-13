@@ -273,8 +273,32 @@
             border-top: 1px solid #e0e0e0;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             z-index: 10;
+        }
+        .photo-upload-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #007bff;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .photo-upload-btn:hover {
+            background-color: #f0f8ff;
+            transform: scale(1.1);
+        }
+        .photo-upload-btn.uploading {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #photo-input {
+            display: none;
         }
         #dm-msg { 
             flex-grow: 1; 
@@ -302,6 +326,23 @@
         }
         #dm-send:hover { 
             background-color: #0056b3; 
+        }
+        /* Image message styling */
+        .dm-image-msg {
+            max-width: 200px;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .dm-image-msg:hover {
+            opacity: 0.9;
+        }
+        .dm-image-msg img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
         }
 
         /* User Modal */
@@ -465,6 +506,8 @@
             </div>
             <ul id="dm-chat"></ul>
             <div class="dm-input-area">
+                <input type="file" id="photo-input" accept="image/*" />
+                <button class="photo-upload-btn" id="photo-upload-btn" title="Upload photo">📷</button>
                 <input id="dm-msg" placeholder="Type a message..." onkeyup="if(event.key=='Enter') document.getElementById('dm-send').click()"/>
                 <button id="dm-send">Send</button>
             </div>
@@ -630,7 +673,13 @@
 
                 socket.on('privateMessage', (data) => {
                     if (data.room !== room) return;
-                    displayDM(data.text, data.senderName, data.senderUid === currentFirebaseUid, data.timestamp);
+                    const isSelf = data.senderUid === currentFirebaseUid;
+                    
+                    if (data.imageUrl) {
+                        displayDM(data.text, data.senderName, isSelf, data.timestamp, data.imageUrl);
+                    } else {
+                        displayDM(data.text, data.senderName, isSelf, data.timestamp);
+                    }
                 });
 
                 // Load history
@@ -646,22 +695,58 @@
                 chat.innerHTML = '';
                 messages.forEach(msg => {
                     const isSelf = msg.senderUid === currentFirebaseUid;
-                    displayDM(msg.text, msg.senderName, isSelf, msg.timestamp);
+                    
+                    if (msg.imageUrl) {
+                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp, msg.imageUrl);
+                    } else {
+                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp);
+                    }
                 });
             } catch (err) {
                 console.error('Error loading DM history', err);
             }
         }
 
-        function displayDM(text, sender, isSelf, timestamp) {
+        function displayDM(text, sender, isSelf, timestamp, imageUrl = null) {
             const chat = document.getElementById('dm-chat');
             const li = document.createElement('li');
             li.className = isSelf ? 'dm-self-msg' : 'dm-other-msg';
+            li.dataset.messageId = Date.now() + Math.random(); // Unique ID for deletion
             
-            const bubble = document.createElement('div');
-            bubble.className = 'dm-message-content';
-            bubble.appendChild(document.createTextNode(text));
-            li.appendChild(bubble);
+            if (imageUrl) {
+                // Display image message
+                const imgDiv = document.createElement('div');
+                imgDiv.className = 'dm-image-msg';
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.alt = 'Chat image';
+                img.onload = function() {
+                    chat.scrollTop = chat.scrollHeight;
+                };
+                imgDiv.appendChild(img);
+                li.appendChild(imgDiv);
+                
+                // Auto-delete image after 10 seconds
+                const messageId = li.dataset.messageId;
+                setTimeout(() => {
+                    const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+                    if (messageEl) {
+                        messageEl.remove();
+                    }
+                    // Call backend to delete from DB and Cloudinary
+                    fetch('/api/dm/delete-message', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ messageId, room, imageUrl })
+                    }).catch(err => console.log('Auto-delete completed'));
+                }, 10000);
+            } else if (text) {
+                // Display text message
+                const bubble = document.createElement('div');
+                bubble.className = 'dm-message-content';
+                bubble.appendChild(document.createTextNode(text));
+                li.appendChild(bubble);
+            }
             
             chat.appendChild(li);
             chat.scrollTop = chat.scrollHeight;
@@ -821,6 +906,61 @@
             socket.emit('privateMessage', payload);
             input.value = '';
         }
+
+        // Photo upload handler
+        document.getElementById('photo-upload-btn').onclick = function() {
+            document.getElementById('photo-input').click();
+        };
+
+        document.getElementById('photo-input').onchange = async function(e) {
+            const file = e.target.files[0];
+            if (!file || !socket || !room) return;
+
+            const uploadBtn = document.getElementById('photo-upload-btn');
+            const sendBtn = document.getElementById('dm-send');
+            uploadBtn.classList.add('uploading');
+            sendBtn.disabled = true;
+
+            try {
+                // Create FormData for Cloudinary upload
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // Upload to your backend endpoint that handles Cloudinary upload
+                const uploadRes = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadRes.ok) throw new Error('Upload failed');
+                
+                const uploadData = await uploadRes.json();
+                const imageUrl = uploadData.url;
+
+                // Send image message via socket
+                const payload = {
+                    senderUid: currentFirebaseUid,
+                    receiverUid: otherUid,
+                    room,
+                    senderName: currentUsername,
+                    imageUrl: imageUrl,
+                    text: ''
+                };
+                socket.emit('privateMessage', payload);
+
+                // Clear input and reset button
+                document.getElementById('photo-input').value = '';
+                uploadBtn.classList.remove('uploading');
+                sendBtn.disabled = false;
+
+            } catch (err) {
+                console.error('Photo upload error:', err);
+                alert('Failed to upload photo. Please try again.');
+                uploadBtn.classList.remove('uploading');
+                sendBtn.disabled = false;
+                document.getElementById('photo-input').value = '';
+            }
+        };
     </script>
 </body>
 </html>
