@@ -83,6 +83,7 @@ const PrivateMessageSchema = new mongoose.Schema({
     senderName: { type: String, required: true },
     text: { type: String, default: '' },
     imageUrl: { type: String, default: null }, // Cloudinary URL for image
+    viewed: { type: Boolean, default: false }, // Track if image has been viewed (for once-view)
     timestamp: { type: Date, default: Date.now }
 });
 
@@ -342,7 +343,7 @@ app.get('/api/user/uid-by-name/:username', async (req, res) => {
 // 6. Fetch Private Message History (Placeholder)
 app.get('/api/dm/history/:room', async (req, res) => {
     try {
-        const messages = await PrivateMessage.find({ room: req.params.room })
+        const messages = await PrivateMessage.find({ room: req.params.room, viewed: false })
             .sort({ timestamp: 1 })
             .limit(100);
         res.send(messages);
@@ -448,8 +449,9 @@ io.on("connection", (socket) => {
             });
             await newPrivate.save();
 
-            // Emit only to the private room
+            // Emit only to the private room (include _id for frontend deletion tracking)
             io.to(room).emit("privateMessage", {
+                _id: newPrivate._id, // Include MongoDB _id
                 senderUid,
                 receiverUid,
                 room,
@@ -502,42 +504,50 @@ app.post('/api/dm/delete-message', async (req, res) => {
             return res.status(400).send({ message: 'messageId and room are required.' });
         }
 
-        // Delete from MongoDB
-        await PrivateMessage.deleteOne({ _id: messageId, room });
+        // IMMEDIATELY mark as viewed in MongoDB (hide from chat history)
+        await PrivateMessage.updateOne(
+            { _id: messageId, room },
+            { viewed: true }
+        );
         
-        // Delete from Cloudinary if imageUrl exists
-        if (imageUrl) {
+        // Schedule deletion from Cloudinary and MongoDB after 10 seconds
+        setTimeout(async () => {
             try {
-                // Extract public_id from Cloudinary URL
-                // URL format: https://res.cloudinary.com/dbuvfb1ye/image/upload/v1234567890/chat_media/filename.jpg
-                // We need to extract: chat_media/filename (without extension)
-                const urlParts = imageUrl.split('/upload/');
-                if (urlParts.length > 1) {
-                    const pathParts = urlParts[1].split('/');
-                    // Remove version (v1234567890) if present
-                    let public_id = pathParts.slice(pathParts[0].startsWith('v') ? 1 : 0).join('/');
-                    // Remove file extension
-                    public_id = public_id.substring(0, public_id.lastIndexOf('.'));
-                    
-                    // Delete from Cloudinary using API
-                    const deleteUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`;
-                    await axios.post(deleteUrl, {
-                        public_id: public_id
-                    }, {
-                        auth: {
-                            username: CLOUDINARY_API_KEY,
-                            password: CLOUDINARY_API_SECRET
+                // Delete from MongoDB
+                await PrivateMessage.deleteOne({ _id: messageId, room });
+                
+                // Delete from Cloudinary if imageUrl exists
+                if (imageUrl) {
+                    try {
+                        // Extract public_id from Cloudinary URL
+                        const urlParts = imageUrl.split('/upload/');
+                        if (urlParts.length > 1) {
+                            const pathParts = urlParts[1].split('/');
+                            let public_id = pathParts.slice(pathParts[0].startsWith('v') ? 1 : 0).join('/');
+                            public_id = public_id.substring(0, public_id.lastIndexOf('.'));
+                            
+                            // Delete from Cloudinary
+                            const deleteUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`;
+                            await axios.post(deleteUrl, {
+                                public_id: public_id
+                            }, {
+                                auth: {
+                                    username: CLOUDINARY_API_KEY,
+                                    password: CLOUDINARY_API_SECRET
+                                }
+                            });
+                            console.log(`Deleted Cloudinary image: ${public_id}`);
                         }
-                    });
-                    console.log(`Deleted Cloudinary image: ${public_id}`);
+                    } catch (cloudinaryError) {
+                        console.error('Error deleting from Cloudinary:', cloudinaryError.message);
+                    }
                 }
-            } catch (cloudinaryError) {
-                console.error('Error deleting from Cloudinary:', cloudinaryError.message);
-                // Don't fail the request if Cloudinary delete fails
+            } catch (error) {
+                console.error('Error in scheduled deletion:', error);
             }
-        }
+        }, 10000); // Wait 10 seconds before actual deletion
         
-        res.send({ message: 'Message deleted successfully.' });
+        res.send({ message: 'Message marked as viewed. Will be deleted in 10 seconds.' });
     } catch (error) {
         console.error('Error deleting message:', error);
         res.status(500).send({ message: 'Error deleting message.', error: error.message });

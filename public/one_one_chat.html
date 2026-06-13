@@ -676,9 +676,9 @@
                     const isSelf = data.senderUid === currentFirebaseUid;
                     
                     if (data.imageUrl) {
-                        displayDM(data.text, data.senderName, isSelf, data.timestamp, data.imageUrl);
+                        displayDM(data.text, data.senderName, isSelf, data.timestamp, data.imageUrl, data._id);
                     } else {
-                        displayDM(data.text, data.senderName, isSelf, data.timestamp);
+                        displayDM(data.text, data.senderName, isSelf, data.timestamp, null, data._id);
                     }
                 });
 
@@ -697,9 +697,9 @@
                     const isSelf = msg.senderUid === currentFirebaseUid;
                     
                     if (msg.imageUrl) {
-                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp, msg.imageUrl);
+                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp, msg.imageUrl, msg._id);
                     } else {
-                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp);
+                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp, null, msg._id);
                     }
                 });
             } catch (err) {
@@ -707,39 +707,95 @@
             }
         }
 
-        function displayDM(text, sender, isSelf, timestamp, imageUrl = null) {
+        function displayDM(text, sender, isSelf, timestamp, imageUrl = null, msgId = null) {
             const chat = document.getElementById('dm-chat');
             const li = document.createElement('li');
             li.className = isSelf ? 'dm-self-msg' : 'dm-other-msg';
-            li.dataset.messageId = Date.now() + Math.random(); // Unique ID for deletion
+            li.dataset.messageId = msgId || (Date.now() + Math.random()); // Use real MongoDB _id if available
             
             if (imageUrl) {
-                // Display image message
-                const imgDiv = document.createElement('div');
-                imgDiv.className = 'dm-image-msg';
-                const img = document.createElement('img');
-                img.src = imageUrl;
-                img.alt = 'Chat image';
-                img.onload = function() {
-                    chat.scrollTop = chat.scrollHeight;
-                };
-                imgDiv.appendChild(img);
-                li.appendChild(imgDiv);
+                // Display "View Once Image" button instead of image directly
+                const buttonDiv = document.createElement('div');
+                buttonDiv.className = 'dm-view-once-btn';
+                buttonDiv.style.cssText = `
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-weight: bold;
+                    width: fit-content;
+                    user-select: none;
+                    transition: transform 0.2s;
+                `;
+                buttonDiv.innerHTML = '📷 View Once Image';
                 
-                // Auto-delete image after 10 seconds
+                // Store imageUrl for later use
                 const messageId = li.dataset.messageId;
-                setTimeout(() => {
-                    const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
-                    if (messageEl) {
-                        messageEl.remove();
-                    }
-                    // Call backend to delete from DB and Cloudinary
+                let imageViewed = false;
+                
+                buttonDiv.onclick = function() {
+                    if (imageViewed) return; // Only allow one view
+                    imageViewed = true;
+                    
+                    // IMMEDIATELY call backend to mark as viewed (hide from history)
+                    const actualMessageId = li.dataset.messageId; // Use real MongoDB _id
                     fetch('/api/dm/delete-message', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ messageId, room, imageUrl })
-                    }).catch(err => console.log('Auto-delete completed'));
-                }, 10000);
+                        body: JSON.stringify({ messageId: actualMessageId, room, imageUrl })
+                    }).catch(err => console.log('Delete request sent'));
+                    
+                    // Replace button with image
+                    li.innerHTML = '';
+                    const imgDiv = document.createElement('div');
+                    imgDiv.className = 'dm-image-msg';
+                    imgDiv.style.cssText = `
+                        max-width: 200px;
+                        border-radius: 8px;
+                        overflow: hidden;
+                    `;
+                    
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.alt = 'Chat image';
+                    img.style.cssText = `
+                        max-width: 100%;
+                        height: auto;
+                        display: block;
+                    `;
+                    img.onload = function() {
+                        chat.scrollTop = chat.scrollHeight;
+                    };
+                    imgDiv.appendChild(img);
+                    li.appendChild(imgDiv);
+                    
+                    // Add countdown timer text
+                    const timerDiv = document.createElement('div');
+                    timerDiv.style.cssText = `
+                        font-size: 12px;
+                        color: #999;
+                        margin-top: 5px;
+                        text-align: center;
+                    `;
+                    timerDiv.textContent = 'Deleting in 10s...';
+                    li.appendChild(timerDiv);
+                    
+                    // Remove from UI after 10 seconds
+                    setTimeout(() => {
+                        const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+                        if (messageEl) {
+                            messageEl.style.opacity = '0';
+                            messageEl.style.transition = 'opacity 0.3s ease';
+                            setTimeout(() => messageEl.remove(), 300);
+                        }
+                    }, 10000);
+                };
+                
+                li.appendChild(buttonDiv);
             } else if (text) {
                 // Display text message
                 const bubble = document.createElement('div');
