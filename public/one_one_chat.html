@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>1-1 Chat Lobby</title>
+    <title>1-1 Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body { 
@@ -13,7 +14,7 @@
             align-items: center;
             min-height: 100vh;
         }
-        .container { 
+        .chat-container { 
             background: white; 
             border-radius: 12px; 
             box-shadow: 0 6px 15px rgba(0,0,0,0.15); 
@@ -22,95 +23,540 @@
             height: 90vh; 
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+        .chat-header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px 20px;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        .chat-header h1 {
+            margin: 0;
+            font-size: 1.5em;
+            text-align: center; 
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: fit-content; 
+            white-space: nowrap; 
+        }
+        .profile-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            overflow: hidden;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            position: absolute; 
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 11;
+        }
+        .profile-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Navigation Bar Styling */
+        .chat-nav {
+            display: flex;
+            justify-content: space-around;
+            background-color: #f0f0f0;
+            padding: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .chat-nav a {
+            text-decoration: none;
+            color: #555;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .chat-nav a:hover {
+            background-color: #ddd;
+        }
+        .chat-nav .active {
+            background-color: #007bff;
+            color: white;
+            pointer-events: none;
+        }
+
+        /* Lobby View */
+        .lobby-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            background: #f9f9f9;
+        }
+        .lobby-container h2 {
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+        .user-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .user-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        .user-item:hover {
+            background-color: #f0f8ff;
+            border-color: #007bff;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+        }
+        .user-name {
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        .user-status {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        /* Chat View */
+        .dm-container {
+            display: none;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        
+        .dm-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .dm-header:hover {
+            background: #f5f5f5;
+        }
+        .dm-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .back-button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #007bff;
+            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+        .dm-username {
+            font-weight: 600;
+            color: #333;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        .dm-username:hover {
+            background-color: #f0f0f0;
+            color: #007bff;
+        }
+        .dm-username-text {
+            flex: 1;
+        }
+        .dm-info-icon {
+            display: flex;
             align-items: center;
             justify-content: center;
-            text-align: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #007bff;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            flex-shrink: 0;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
         }
-        h1 { color: #007bff; }
-        p { color: #555; }
-        a { color: #007bff; text-decoration: none; font-weight: bold; }
+        .dm-username:hover .dm-info-icon {
+            opacity: 1;
+            background-color: #0056b3;
+        }
+        
+        #dm-chat { 
+            list-style: none; 
+            padding: 12px 16px;
+            flex-grow: 1; 
+            overflow-y: auto; 
+            background: #f9f9f9; 
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #dm-chat li { 
+            padding: 0; 
+            word-wrap: break-word; 
+            display: flex;
+            align-items: flex-start;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .dm-message-content {
+            padding: 10px 14px;
+            border-radius: 18px;
+            max-width: 78%;
+            display: block;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .dm-self-msg { 
+            justify-content: flex-end; 
+        }
+        .dm-self-msg .dm-message-content { 
+            background-color: #DCF8C6; 
+            color: #111; 
+            margin-left: auto; 
+            margin-right: 8px; 
+        }
+        .dm-other-msg { 
+            justify-content: flex-start; 
+        }
+        .dm-other-msg .dm-message-content { 
+            background-color: #E2E2E2; 
+            color: #111; 
+            margin-right: auto; 
+            margin-left: 8px; 
+        }
+        
+        .dm-input-area { 
+            padding: 12px 16px; 
+            background-color: #fff;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+        }
+        .photo-upload-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #007bff;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .photo-upload-btn:hover {
+            background-color: #f0f8ff;
+            transform: scale(1.1);
+        }
+        .photo-upload-btn.uploading {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #photo-input {
+            display: none;
+        }
+        #dm-msg { 
+            flex-grow: 1; 
+            padding: 12px 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 25px; 
+            font-size: 0.95em;
+            outline: none;
+            font-family: 'Roboto', sans-serif;
+        }
+        #dm-msg:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        #dm-send { 
+            padding: 10px 20px; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        #dm-send:hover { 
+            background-color: #0056b3; 
+        }
+        /* Image message styling */
+        .dm-image-msg {
+            max-width: 200px;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .dm-image-msg:hover {
+            opacity: 0.9;
+        }
+        .dm-image-msg img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+        }
+
+        /* User Modal */
+        #user-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .modal-content {
+            background: #fff;
+            width: 650px;
+            max-width: 96%;
+            margin: auto;
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.35);
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(90deg,#f7fbff,#ffffff);
+        }
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        .modal-body {
+            padding: 22px;
+        }
+        .modal-footer {
+            padding: 14px 18px;
+            border-top: 1px solid #eee;
+            text-align: right;
+            background: #fbfbfe;
+        }
+        .modal-close-footer {
+            padding: 8px 16px;
+            border-radius: 6px;
+            background: #0b5ed7;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        /* Image Lightbox */
+        #image-lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        .lightbox-container {
+            position: relative;
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #lightbox-close {
+            position: absolute;
+            top: -35px;
+            right: 0;
+            background: transparent;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #fff;
+        }
+        #lightbox-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+        #lightbox-prev, #lightbox-next {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.2);
+            border: none;
+            font-size: 32px;
+            cursor: pointer;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        #lightbox-prev { left: -50px; }
+        #lightbox-next { right: -50px; }
+        #lightbox-prev:hover, #lightbox-next:hover {
+            background: rgba(255,255,255,0.4);
+        }
+        #lightbox-counter {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
-    <div class="container" id="lobby-container">
-        <h1>1-1 Chat Lobby</h1>
-        <p>Available users for private text chat:</p>
-        <ul id="user-list" style="list-style:none; padding:0; margin:10px 0; display:flex; flex-direction:column; gap:8px; width:100%; align-items:center; max-width:640px"></ul>
-        <p>Go back to the <a href="index.html">Group Chat</a> to continue.</p>
-    </div>
-    
-    <!-- Chat UI (replaces placeholder) -->
-    <div class="container" id="dm-container" style="display:none; align-items:stretch;">
-        <div style="padding: 8px 12px; width: 100%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e8e8e8; background: #fff;" onclick="if(typeof showUserDetails==='function') showUserDetails(otherUid);">
-            <!-- Left cluster: Back + divider + username (username left) -->
-            <div style="display:flex; align-items:center; gap:10px;">
-                <a href="one_one_chat.html" onclick="event.stopPropagation();" style="display:flex; align-items:center; gap:6px; color:#0066cc; font-weight:500; text-decoration:none; font-size:0.95em; padding:4px 8px; border-radius:4px; transition:background 0.15s;" onmouseover="this.style.background='#f6faff'" onmouseout="this.style.background='transparent'">← Back</a>
-                <div id="header-divider" onclick="event.stopPropagation(); if(typeof showUserDetails==='function') showUserDetails(otherUid);" style="width:1px; height:36px; background:#d7d7d7; cursor:pointer; border-radius:2px;" title="View profile"></div>
-                <div style="display:flex; flex-direction:column; cursor:pointer;" onclick="event.stopPropagation(); if(typeof showUserDetails==='function') showUserDetails(otherUid);">
-                    <a id="dm-username" href="javascript:void(0)" style="font-weight:700; color:#111; text-decoration:none; font-size:1em;">User</a>
-                    <div style="font-size:0.75em; color:#999; font-weight:400;">Click to view profile</div>
+
+    <div class="chat-container">
+        <!-- Header -->
+        <div class="chat-header">
+            <h1 id="welcome-header">Welcome!</h1>
+            <div class="profile-icon" onclick="goToProfile()">
+                <img src="/user_profile.png" alt="Profile" />
+            </div>
+        </div>
+        
+        <!-- Navigation Bar -->
+        <div class="chat-nav">
+            <a href="index.html">Group Chat</a>
+            <a href="one_one_chat.html" class="active">1-1 Chat</a>
+            <a href="one_one_vc.html">1-1 VC</a>
+            <a href="donate.html">Donate & Support</a>
+        </div>
+
+        <!-- Lobby View (User List) -->
+        <div class="lobby-container" id="lobby-container">
+
+            <p style="color: #666; margin-bottom: 20px;">From the group chat , click the person name to start chatting</p>
+            <ul id="user-list" class="user-list"></ul>
+        </div>
+
+        <!-- Chat View -->
+        <div class="dm-container" id="dm-container">
+            <div class="dm-header" onclick="if(typeof showUserDetails==='function') showUserDetails(otherUid);">
+                <div class="dm-header-left">
+                    <button class="back-button" onclick="backToLobby()">←</button>
+                    <div class="dm-username" id="dm-header-username-container">
+                        <span class="dm-username-text">Chat</span>
+                        <div class="dm-info-icon" title="Tap to view user details">ⓘ</div>
+                    </div>
                 </div>
             </div>
-            <!-- remove extra right space -->
-            <div style="width:6px;"></div>
-        </div>
-        <ul id="dm-chat" style="list-style:none; padding:12px 16px; flex-grow:1; overflow-y:auto; margin:0; background:#f9f9f9; width:100%; box-sizing:border-box; display:flex; flex-direction:column; gap:8px;"></ul>
-        <div style="display:flex; padding:12px 16px; gap:10px; background:#fff; border-top:1px solid #e0e0e0;">
-            <input id="dm-msg" placeholder="Type a message..." style="flex:1; padding:12px 14px; border-radius:20px; border:1px solid #ddd; font-size:0.95em; outline:none;" onkeyup="if(event.key=='Enter') document.getElementById('dm-send').click()"/>
-            <button id="dm-send" style="padding:10px 20px; border-radius:20px; background:#007bff; color:white; border:none; font-weight:600; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">Send</button>
+            <ul id="dm-chat"></ul>
+            <div class="dm-input-area">
+                <input type="file" id="photo-input" accept="image/*" />
+                <button class="photo-upload-btn" id="photo-upload-btn" title="Upload photo">📷</button>
+                <input id="dm-msg" placeholder="Type a message..." onkeyup="if(event.key=='Enter') document.getElementById('dm-send').click()"/>
+                <button id="dm-send">Send</button>
+            </div>
         </div>
     </div>
 
-    <!-- Read-only User Details Modal (larger, richer layout) -->
-    <div id="user-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:9999;">
-        <div style="background:#fff; width:650px; max-width:96%; margin:auto; border-radius:12px; box-shadow:0 16px 48px rgba(0,0,0,0.35); overflow:hidden;">
-            <div style="padding:14px 18px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background: linear-gradient(90deg,#f7fbff,#ffffff);">
-                <strong style="font-size:16px;">User Details</strong>
-                <button id="close-user-modal" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:#666;">✕</button>
+    <!-- User Details Modal -->
+    <div id="user-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin: 0; color: #333;">User Details</h3>
+                <button class="modal-close-btn" onclick="closeUserModal()">✕</button>
             </div>
-            <div id="user-details-content" style="padding:22px; display:flex; gap:20px; align-items:flex-start;">
-                <!-- Left side: Image + Click to View text -->
-                <div style="display:flex; flex-direction:column; gap:12px; align-items:center;">
-                    <!-- Image section: larger, clickable, with green border -->
-                    <div id="user-image-box" style="width:180px; height:180px; border-radius:14px; background:linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%); display:flex; align-items:center; justify-content:center; font-weight:700; color:#999; cursor:pointer; position:relative; overflow:hidden; flex-shrink:0; border:3px solid #28a745;">IMG</div>
-                    
-                    <!-- Text hint only -->
-                    <div style="font-weight:600; color:#28a745; font-size:12px;">Click to View</div>
-                </div>
-                
-                <!-- Right side: User info -->
-                <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Username</strong></div><div id="ud-username" style="color:#222; font-weight:500;"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Age</strong></div><div id="ud-age" style="color:#222;"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Weight</strong></div><div id="ud-weight" style="color:#222;"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Role</strong></div><div id="ud-role" style="color:#222;"></div></div>
-                    <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Type</strong></div><div id="ud-type" style="color:#222;"></div></div>
-                    <div style="display:flex; gap:12px; align-items:flex-start;"><div style="min-width:100px; color:#444;"><strong>About</strong></div><div id="ud-about" style="color:#222; max-width:280px;"></div></div>
+            <div id="user-details-content" class="modal-body">
+                <!-- Content loaded dynamically -->
+                <div style="display:flex; gap:20px; align-items:flex-start;">
+                    <!-- Left side: Image -->
+                    <div style="display:flex; flex-direction:column; gap:12px; align-items:center;">
+                        <div id="user-image-box" style="width:180px; height:180px; border-radius:14px; background:linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%); display:flex; align-items:center; justify-content:center; font-weight:700; color:#999; cursor:pointer; position:relative; overflow:hidden; flex-shrink:0; border:3px solid #28a745;">IMG</div>
+                        <div style="font-weight:600; color:#28a745; font-size:12px;">Click to View</div>
+                    </div>
+                    <!-- Right side: Info -->
+                    <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
+                        <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Username</strong></div><div id="ud-username" style="color:#222; font-weight:500;"></div></div>
+                        <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Age</strong></div><div id="ud-age" style="color:#222;"></div></div>
+                        <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Weight</strong></div><div id="ud-weight" style="color:#222;"></div></div>
+                        <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Role</strong></div><div id="ud-role" style="color:#222;"></div></div>
+                        <div style="display:flex; gap:12px; align-items:center;"><div style="min-width:100px; color:#444;"><strong>Type</strong></div><div id="ud-type" style="color:#222;"></div></div>
+                        <div style="display:flex; gap:12px; align-items:flex-start;"><div style="min-width:100px; color:#444;"><strong>About</strong></div><div id="ud-about" style="color:#222; max-width:280px;"></div></div>
+                    </div>
                 </div>
             </div>
-            <div style="padding:14px 18px; border-top:1px solid #eee; text-align:right; background:#fbfbfe;"><button id="close-user-modal-2" style="padding:8px 16px; border-radius:6px; background:#0b5ed7; color:#fff; border:none; cursor:pointer; font-weight:500;">Close</button></div>
+            <div class="modal-footer">
+                <button class="modal-close-footer" onclick="closeUserModal()">Close</button>
+            </div>
         </div>
     </div>
 
-    <!-- Image Gallery Lightbox with Swipe -->
-    <div id="image-lightbox" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center;">
-        <div style="position:relative; width:90%; max-width:600px; display:flex; align-items:center; justify-content:center;">
-            <!-- Close Button -->
-            <button id="lightbox-close" style="position:absolute; top:-35px; right:0; background:transparent; border:none; font-size:28px; cursor:pointer; color:#fff;">✕</button>
-            
-            <!-- Image Container -->
-            <div id="lightbox-container" style="position:relative; width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:8px;">
-                <img id="lightbox-image" src="" alt="gallery" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
+    <!-- Image Lightbox -->
+    <div id="image-lightbox">
+        <div class="lightbox-container">
+            <button id="lightbox-close">✕</button>
+            <div id="lightbox-container">
+                <img id="lightbox-image" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
             </div>
-            
-            <!-- Previous Button -->
-            <button id="lightbox-prev" style="position:absolute; left:-50px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.2); border:none; font-size:32px; cursor:pointer; color:#fff; padding:10px 15px; border-radius:8px; transition:background 0.2s;">❮</button>
-            
-            <!-- Next Button -->
-            <button id="lightbox-next" style="position:absolute; right:-50px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.2); border:none; font-size:32px; cursor:pointer; color:#fff; padding:10px 15px; border-radius:8px; transition:background 0.2s;">❯</button>
-            
-            <!-- Image Counter -->
-            <div id="lightbox-counter" style="position:absolute; bottom:15px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.5); color:#fff; padding:6px 12px; border-radius:20px; font-size:12px;">1/1</div>
+            <button id="lightbox-prev">❮</button>
+            <button id="lightbox-next">❯</button>
+            <div id="lightbox-counter">1/1</div>
         </div>
     </div>
 
@@ -146,44 +592,58 @@
             return `${arr[0]}_${arr[1]}`;
         }
 
+        function goToProfile() {
+            window.location.href = 'profile.html';
+        }
+
+        function backToLobby() {
+            window.location.href = 'one_one_chat.html';
+        }
+
         window.onload = function() {
             otherUid = parseQuery();
-                if (!otherUid) {
-                    // show the placeholder listing: fill user list and return
-                    auth.onAuthStateChanged(async (user) => {
-                        if (!user) return window.location.href = 'auth.html';
-                        currentFirebaseUid = user.uid;
-                            try {
-                                const res = await fetch(`/api/dm/peers/${currentFirebaseUid}`);
-                                const peers = await res.json();
-                                const userList = document.getElementById('user-list');
-                                userList.innerHTML = '';
-                                peers.forEach(p => {
-                                    const li = document.createElement('li');
-                                    li.style.width = '100%';
-                                    li.style.display = 'flex';
-                                    li.style.justifyContent = 'center';
-                                    li.style.alignItems = 'center';
-                                    const btn = document.createElement('button');
-                                    btn.style.padding = '10px 16px';
-                                    btn.style.border = '1px solid #ddd';
-                                    btn.style.borderRadius = '8px';
-                                    btn.style.background = '#fff';
-                                    btn.style.width = '100%';
-                                    btn.style.maxWidth = '640px';
-                                    btn.style.cursor = 'pointer';
-                                    // Compose label with name, snippet, and timestamp
-                                    btn.innerHTML = `<div style="display:flex; justify-content:space-between; width:100%;"><div style=\"text-align:left;\"><strong>${p.username}</strong><br/><small style=\"color:#666;\">${p.lastMessage ? (p.lastMessage.length > 36 ? p.lastMessage.slice(0,36) + '...' : p.lastMessage) : ''}</small></div><div style=\"color:#888; font-size:0.8em; text-align:right;\">${new Date(p.timestamp).toLocaleString()}</div></div>`;
-                                    btn.onclick = () => { window.location.href = `one_one_chat.html?uid=${encodeURIComponent(p.uid)}`; };
-                                    li.appendChild(btn);
-                                    userList.appendChild(li);
-                                });
-                        } catch (err) {
-                            console.error('Error fetching users for lobby', err);
-                        }
-                    });
-                    return;
-                }
+            if (!otherUid) {
+                // Show the lobby view: fill user list
+                auth.onAuthStateChanged(async (user) => {
+                    if (!user) return window.location.href = 'auth.html';
+                    currentFirebaseUid = user.uid;
+                    
+                    // Fetch current user's username
+                    try {
+                        const meResp = await fetch(`/api/user/details/${currentFirebaseUid}`);
+                        const meData = await meResp.json();
+                        currentUsername = meData.username;
+                        document.getElementById('welcome-header').innerHTML = `Welcome, ${currentUsername}!`;
+                    } catch (err) {
+                        console.error('Error fetching current user', err);
+                    }
+
+                    // Fetch list of peers
+                    try {
+                        const res = await fetch(`/api/dm/peers/${currentFirebaseUid}`);
+                        const peers = await res.json();
+                        const userList = document.getElementById('user-list');
+                        userList.innerHTML = '';
+                        peers.forEach(p => {
+                            const li = document.createElement('li');
+                            li.className = 'user-item';
+                            li.innerHTML = `
+                                <div class="user-name">${p.username}</div>
+                                <div class="user-status">${p.lastMessage ? (p.lastMessage.length > 50 ? p.lastMessage.slice(0, 50) + '...' : p.lastMessage) : 'No messages yet'}</div>
+                                <div style="font-size: 0.85em; color: #999; margin-top: 5px;">${new Date(p.timestamp).toLocaleString()}</div>
+                            `;
+                            li.onclick = () => {
+                                window.location.href = `one_one_chat.html?uid=${encodeURIComponent(p.uid)}`;
+                            };
+                            userList.appendChild(li);
+                        });
+                    } catch (err) {
+                        console.error('Error fetching users for lobby', err);
+                    }
+                });
+                return;
+            }
+
             // Show the DM container and hide the lobby
             document.getElementById('dm-container').style.display = 'flex';
             document.getElementById('lobby-container').style.display = 'none';
@@ -191,32 +651,39 @@
             auth.onAuthStateChanged(async (user) => {
                 if (!user) return window.location.href = 'auth.html';
                 currentFirebaseUid = user.uid;
-                // fetch current username
+                
+                // Fetch current user's username
                 const meResp = await fetch(`/api/user/details/${currentFirebaseUid}`);
                 const meData = await meResp.json();
                 currentUsername = meData.username;
+                document.getElementById('welcome-header').innerHTML = `Welcome, ${currentUsername}!`;
 
-                // fetch other user's display name
+                // Fetch other user's display name
                 const othersResp = await fetch(`/api/user/full-details/${otherUid}`);
                 const otherData = await othersResp.json();
                 const displayName = otherData.username || otherData.name || 'Unknown';
-                const dmUsernameEl = document.getElementById('dm-username');
-                if (dmUsernameEl) {
-                    dmUsernameEl.innerText = displayName;
-                    dmUsernameEl.onclick = function() { showUserDetails(otherUid); };
-                }
+                document.querySelector('.dm-username-text').innerText = displayName;
 
-                // compute the room
+                // Compute the room
                 room = createRoomName(currentFirebaseUid, otherUid);
 
                 // Connect socket
-                socket = io('http://localhost:5000');
+                const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+                const host = window.location.hostname;
+                const port = 5000;
+                socket = io(`${protocol}://${host}:${port}`);
                 socket.emit('identify', { firebaseUid: currentFirebaseUid });
                 socket.emit('joinPrivate', { room });
 
                 socket.on('privateMessage', (data) => {
-                    if (data.room !== room) return; // ignore unrelated rooms
-                    displayDM(data.text, data.senderName, data.senderUid === currentFirebaseUid, data.timestamp);
+                    if (data.room !== room) return;
+                    const isSelf = data.senderUid === currentFirebaseUid;
+                    
+                    if (data.imageUrl) {
+                        displayDM(data.text, data.senderName, isSelf, data.timestamp, data.imageUrl, data._id);
+                    } else {
+                        displayDM(data.text, data.senderName, isSelf, data.timestamp, null, data._id);
+                    }
                 });
 
                 // Load history
@@ -232,42 +699,130 @@
                 chat.innerHTML = '';
                 messages.forEach(msg => {
                     const isSelf = msg.senderUid === currentFirebaseUid;
-                    displayDM(msg.text, msg.senderName, isSelf, msg.timestamp);
+                    
+                    if (msg.imageUrl) {
+                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp, msg.imageUrl, msg._id);
+                    } else {
+                        displayDM(msg.text, msg.senderName, isSelf, msg.timestamp, null, msg._id);
+                    }
                 });
             } catch (err) {
                 console.error('Error loading DM history', err);
             }
         }
 
-        function displayDM(text, sender, isSelf, timestamp) {
+        function displayDM(text, sender, isSelf, timestamp, imageUrl = null, msgId = null) {
             const chat = document.getElementById('dm-chat');
             const li = document.createElement('li');
-            li.style.display = 'flex';
-            li.style.justifyContent = isSelf ? 'flex-end' : 'flex-start';
-            li.style.padding = '6px 0';
-            li.style.width = '100%';
-            li.style.boxSizing = 'border-box';
-            const bubble = document.createElement('div');
-            bubble.style.maxWidth = '70%';
-            bubble.style.padding = '10px 14px';
-            bubble.style.borderRadius = '14px';
-            bubble.style.background = isSelf ? '#DCF8C6' : '#E2E2E2';
-            bubble.style.color = '#111';
-            bubble.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
-            /* Align bubble to the correct side by using auto margins */
-            bubble.style.marginLeft = isSelf ? 'auto' : '0';
-            bubble.style.marginRight = isSelf ? '0' : 'auto';
-            bubble.appendChild(document.createTextNode(text));
-            li.appendChild(bubble);
-            // timestamp
-            const tsEl = document.createElement('div');
-            tsEl.style.fontSize = '12px';
-            tsEl.style.color = '#666';
-            tsEl.style.marginTop = '4px';
-            tsEl.style.marginLeft = isSelf ? '8px' : '0';
-            tsEl.style.marginRight = isSelf ? '0' : '8px';
-            tsEl.innerText = timestamp ? new Date(timestamp).toLocaleTimeString() : '';
-            li.appendChild(tsEl);
+            li.className = isSelf ? 'dm-self-msg' : 'dm-other-msg';
+            li.dataset.messageId = msgId || (Date.now() + Math.random()); // Use real MongoDB _id if available
+            
+            if (imageUrl) {
+                if (isSelf) {
+                    // For sender: Just show "You sent an image" text
+                    const bubble = document.createElement('div');
+                    bubble.className = 'dm-message-content';
+                    bubble.style.cssText = `
+                        background: #dcf8c6;
+                        color: #000;
+                        padding: 10px 15px;
+                        border-radius: 8px;
+                        display: inline-block;
+                        max-width: 70%;
+                    `;
+                    bubble.appendChild(document.createTextNode('📷 You sent an image'));
+                    li.appendChild(bubble);
+                } else {
+                    // For receiver: Show "View Once Image" button
+                    const buttonDiv = document.createElement('div');
+                    buttonDiv.className = 'dm-view-once-btn';
+                    buttonDiv.style.cssText = `
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 12px 20px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-weight: bold;
+                        width: fit-content;
+                        user-select: none;
+                        transition: transform 0.2s;
+                    `;
+                    buttonDiv.innerHTML = '📷 View Once Image';
+                    
+                    const messageId = li.dataset.messageId;
+                    let imageViewed = false;
+                    
+                    buttonDiv.onclick = function() {
+                        if (imageViewed) return;
+                        imageViewed = true;
+                        
+                        // IMMEDIATELY call backend to mark as viewed
+                        const actualMessageId = li.dataset.messageId;
+                        fetch('/api/dm/delete-message', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ messageId: actualMessageId, room, imageUrl })
+                        }).catch(err => console.log('Delete request sent'));
+                        
+                        // Replace button with image
+                        li.innerHTML = '';
+                        const imgDiv = document.createElement('div');
+                        imgDiv.className = 'dm-image-msg';
+                        imgDiv.style.cssText = `
+                            max-width: 200px;
+                            border-radius: 8px;
+                            overflow: hidden;
+                        `;
+                        
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        img.alt = 'Chat image';
+                        img.style.cssText = `
+                            max-width: 100%;
+                            height: auto;
+                            display: block;
+                        `;
+                        img.onload = function() {
+                            chat.scrollTop = chat.scrollHeight;
+                        };
+                        imgDiv.appendChild(img);
+                        li.appendChild(imgDiv);
+                        
+                        // Add countdown timer text
+                        const timerDiv = document.createElement('div');
+                        timerDiv.style.cssText = `
+                            font-size: 12px;
+                            color: #999;
+                            margin-top: 5px;
+                            text-align: center;
+                        `;
+                        timerDiv.textContent = 'Deleting in 10s...';
+                        li.appendChild(timerDiv);
+                        
+                        // Remove from UI after 10 seconds
+                        setTimeout(() => {
+                            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+                            if (messageEl) {
+                                messageEl.style.opacity = '0';
+                                messageEl.style.transition = 'opacity 0.3s ease';
+                                setTimeout(() => messageEl.remove(), 300);
+                            }
+                        }, 10000);
+                    };
+                    
+                    li.appendChild(buttonDiv);
+                }
+            } else if (text) {
+                // Display text message
+                const bubble = document.createElement('div');
+                bubble.className = 'dm-message-content';
+                bubble.appendChild(document.createTextNode(text));
+                li.appendChild(bubble);
+            }
+            
             chat.appendChild(li);
             chat.scrollTop = chat.scrollHeight;
         }
@@ -305,12 +860,9 @@
 
                 const modal = document.getElementById('user-modal');
                 modal.style.display = 'flex';
-
-                // wire close buttons
-                document.getElementById('close-user-modal').onclick = closeUserModal;
-                document.getElementById('close-user-modal-2').onclick = closeUserModal;
-                // clicking outside content closes the modal
-                modal.onclick = function(e) { if (e.target === modal) closeUserModal(); };
+                modal.onclick = function(e) { 
+                    if (e.target === modal) closeUserModal(); 
+                };
             } catch (err) {
                 console.error('Error loading user details', err);
                 alert('Could not load user details.');
@@ -389,10 +941,8 @@
             
             if (Math.abs(diff) > swipeThreshold) {
                 if (diff > 0) {
-                    // Swiped left, show next image
                     currentGalleryIndex = (currentGalleryIndex + 1) % currentGalleryImages.length;
                 } else {
-                    // Swiped right, show previous image
                     currentGalleryIndex = (currentGalleryIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
                 }
                 updateLightboxImage();
@@ -431,6 +981,61 @@
             socket.emit('privateMessage', payload);
             input.value = '';
         }
+
+        // Photo upload handler
+        document.getElementById('photo-upload-btn').onclick = function() {
+            document.getElementById('photo-input').click();
+        };
+
+        document.getElementById('photo-input').onchange = async function(e) {
+            const file = e.target.files[0];
+            if (!file || !socket || !room) return;
+
+            const uploadBtn = document.getElementById('photo-upload-btn');
+            const sendBtn = document.getElementById('dm-send');
+            uploadBtn.classList.add('uploading');
+            sendBtn.disabled = true;
+
+            try {
+                // Create FormData for Cloudinary upload
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // Upload to your backend endpoint that handles Cloudinary upload
+                const uploadRes = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadRes.ok) throw new Error('Upload failed');
+                
+                const uploadData = await uploadRes.json();
+                const imageUrl = uploadData.url;
+
+                // Send image message via socket
+                const payload = {
+                    senderUid: currentFirebaseUid,
+                    receiverUid: otherUid,
+                    room,
+                    senderName: currentUsername,
+                    imageUrl: imageUrl,
+                    text: ''
+                };
+                socket.emit('privateMessage', payload);
+
+                // Clear input and reset button
+                document.getElementById('photo-input').value = '';
+                uploadBtn.classList.remove('uploading');
+                sendBtn.disabled = false;
+
+            } catch (err) {
+                console.error('Photo upload error:', err);
+                alert('Failed to upload photo. Please try again.');
+                uploadBtn.classList.remove('uploading');
+                sendBtn.disabled = false;
+                document.getElementById('photo-input').value = '';
+            }
+        };
     </script>
 </body>
 </html>
